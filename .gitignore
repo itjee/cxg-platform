@@ -1,0 +1,63 @@
+# 환경 변수
+.env
+.env.local
+.env.*.local
+
+# 의존성
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# 빌드 출력
+.next/
+out/
+dist/
+build/
+
+# 로그
+*.log
+logs/
+
+# 임시 파일
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE 설정
+.vscode/settings.json
+.idea/
+
+# 데이터베이스
+*.db
+*.sqlite3
+
+# 업로드된 파일
+uploads/
+static/uploads/
+
+# 백업 파일
+*.bak
+*.backup
+
+# 테스트 결과
+.pytest_cache/
+.coverage
+htmlcov/
+.nyc_output/
+coverage/
+
+# Docker
+.dockerignore
+
+# 캐시
+.cache/
+.turbo/
+
+# 시크릿
+secrets/
+*.pem
+*.key

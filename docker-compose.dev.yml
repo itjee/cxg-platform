@@ -1,0 +1,160 @@
+version: "3.8"
+
+services:
+  # PostgreSQL - 관리자 DB와 테넌트 DB를 위한 단일 인스턴스
+  postgres:
+    image: postgres:15-alpine
+    container_name: cxg-database
+    environment:
+      POSTGRES_DB: cxg_platform
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: cxg2025!!
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d cxg_platform"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis - 캐싱 및 세션 관리
+  redis:
+    image: redis:7-alpine
+    container_name: cxg-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Insight - Redis 관리 도구
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: cxg-redis-insight
+    ports:
+      - "8001:8001"
+    depends_on:
+      - redis
+
+  # API Server - 백엔드 API 서버
+  api-server:
+    build:
+      context: ./apps/api-server
+      dockerfile: Dockerfile
+      target: development
+    container_name: cxg-api-server
+    ports:
+      - "8100:8000"
+    environment:
+      - DATABASE_URL_MANAGES=postgresql://admin:cxg2025!!@postgres:5432/mgmt
+      - DATABASE_URL_TENANTS=postgresql://admin:cxg2025!!@postgres:5432/tnnt
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=cb8932c56d07af17401bca73074c9e932c9640117d194ce9e3584bd064157721
+      - PYTHONPATH=/app
+    volumes:
+      - ./apps/api-server:/app
+      - api_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cxg-network
+    restart: unless-stopped
+
+  web-mgmt:
+    build:
+      context: ./apps/web-mgmt
+      dockerfile: Dockerfile
+      target: development
+    container_name: cxg-web-mgmt
+    ports:
+      - "3100:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://192.168.0.200:8100
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - ./apps/web-mgmt:/app
+      - /app/node_modules
+    depends_on:
+      - api-server
+    networks:
+      - cxg-network
+    restart: unless-stopped
+
+  web-tenant:
+    build:
+      context: ./apps/web-tenant
+      dockerfile: Dockerfile
+      target: development
+    container_name: cxg-web-tenant
+    ports:
+      - "3200:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8100
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - ./apps/web-tenant:/app
+      - /app/node_modules
+    depends_on:
+      - api-server
+    networks:
+      - cxg-network
+
+  # MinIO - S3 호환 객체 스토리지 (개발용)
+  minio:
+    image: minio/minio:latest
+    container_name: cxg-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
+  # Prometheus - 메트릭 수집
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: cxg-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+  # Grafana - 메트릭 시각화
+  grafana:
+    image: grafana/grafana:latest
+    container_name: cxg-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:
+  api_uploads:
+
+networks:
+  cxg-network:
+    driver: bridge

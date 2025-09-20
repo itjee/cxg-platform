@@ -1,0 +1,50 @@
+[project]
+name = "cxg-platform-api"
+version = "0.1.0"
+description = "CXG 플랫폼 API"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104.1",
+    "uvicorn[standard]>=0.24.0",
+    "sqlmodel>=0.0.14",
+    "psycopg2-binary>=2.9.9",
+    "redis>=5.0.1",
+    "pydantic>=2.5.0",
+    "python-multipart>=0.0.6",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "openai>=1.6.1",
+    "langchain>=0.0.350",
+    "pinecone-client>=2.2.4",
+    "celery>=5.3.4",
+    "alembic>=1.13.0",
+    "prometheus-client>=0.19.0",
+    "structlog>=23.2.0",
+    "strawberry-graphql[fastapi]>=0.216.0",
+    "pydantic[email]>=2.5.0",
+    "pydantic-settings>=2.10.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+    "httpx>=0.25.2",
+    "black>=23.11.0",
+    "isort>=5.12.0",
+    "mypy>=1.7.1",
+    "pre-commit>=3.6.0"
+]
+
+[tool.black]
+line-length = 120
+
+[flake8]
+max-line-length = 120
