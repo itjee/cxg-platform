@@ -3,7 +3,7 @@
 -- ============================================================================
 CREATE SCHEMA IF NOT EXISTS audt;
 
-COMMENT ON SCHEMA audt 
+COMMENT ON SCHEMA audt
 IS 'AUDT: 보안/감사 스키마: 보안 이벤트 기록과 규정 준수 산출물을 저장(append-only 권장).';
 
 -- ============================================================================
@@ -41,11 +41,11 @@ CREATE TABLE IF NOT EXISTS audt.audit_logs
     -- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'ACTIVE',              	-- 감사 로그 상태 (ACTIVE/ARCHIVED/PURGED)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT fk_audit_logs__tenant_id 			FOREIGN KEY (tenant_id) REFERENCES tnnt.tenants(id)	ON DELETE CASCADE,
     CONSTRAINT fk_audit_logs__user_id 				FOREIGN KEY (user_id) 	REFERENCES tnnt.users(id)	ON DELETE CASCADE,
-	
+
     CONSTRAINT ck_audit_logs__event_type 			CHECK (event_type IN ('LOGIN', 'LOGOUT', 'API_CALL', 'DATA_ACCESS', 'ADMIN_ACTION', 'PASSWORD_CHANGE', 'PERMISSION_CHANGE')),
     CONSTRAINT ck_audit_logs__event_category 		CHECK (event_category IN ('AUTHENTICATION', 'AUTHORIZATION', 'DATA_MODIFICATION', 'SYSTEM_CHANGE', 'SECURITY_VIOLATION')),
     CONSTRAINT ck_audit_logs__resource_type 		CHECK (resource_type IN ('TABLE', 'API_ENDPOINT', 'FILE', 'CONFIGURATION', 'USER_ACCOUNT', 'TENANT_SETTINGS')),
@@ -88,13 +88,13 @@ CREATE INDEX IF NOT EXISTS ix_audit_logs__created_at
 -- 테넌트별 감사 로그 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_audit_logs__tenant_id
     ON audt.audit_logs (tenant_id, created_at DESC)
- WHERE tenant_id IS NOT NULL 
+ WHERE tenant_id IS NOT NULL
    AND deleted = FALSE;
 
 -- 사용자별 감사 로그 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_audit_logs__user_id
     ON audt.audit_logs (user_id, created_at DESC)
- WHERE user_id IS NOT NULL 
+ WHERE user_id IS NOT NULL
    AND deleted = FALSE;
 
 -- 이벤트 유형별 조회 최적화
@@ -120,43 +120,43 @@ CREATE INDEX IF NOT EXISTS ix_audit_logs__result
 -- 고위험 이벤트 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_audit_logs__high_risk_audit_logs
     ON audt.audit_logs (risk_level, event_type, created_at DESC)
- WHERE risk_level = 'HIGH' 
+ WHERE risk_level = 'HIGH'
    AND deleted = FALSE;
 
 -- 실패/차단 이벤트 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_audit_logs__failed_audit_logs
     ON audt.audit_logs (result, event_type, created_at DESC)
- WHERE result IN ('FAILURE', 'BLOCKED') 
+ WHERE result IN ('FAILURE', 'BLOCKED')
    AND deleted = FALSE;
 
 -- IP별 감사 로그 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_audit_logs__source_ip
     ON audt.audit_logs (source_ip, created_at DESC)
- WHERE source_ip IS NOT NULL 
+ WHERE source_ip IS NOT NULL
    AND deleted = FALSE;
 
 -- 세션별 감사 로그 추적 최적화
 CREATE INDEX IF NOT EXISTS ix_audit_logs__session_id
     ON audt.audit_logs (session_id, created_at DESC)
- WHERE session_id IS NOT NULL 
+ WHERE session_id IS NOT NULL
    AND deleted = FALSE;
 
 -- 리소스별 접근 기록 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_audit_logs__resource_access
     ON audt.audit_logs (resource_type, resource_id, created_at DESC)
- WHERE resource_type IS NOT NULL 
+ WHERE resource_type IS NOT NULL
    AND deleted = FALSE;
 
 -- 사용자별 액션 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_audit_logs__user_actions
     ON audt.audit_logs (user_id, action_performed, created_at DESC)
- WHERE user_id IS NOT NULL 
+ WHERE user_id IS NOT NULL
    AND deleted = FALSE;
 
 -- 테넌트별 보안 이벤트 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_audit_logs__tenant_security
     ON audt.audit_logs (tenant_id, risk_level, event_category, created_at DESC)
- WHERE tenant_id IS NOT NULL 
+ WHERE tenant_id IS NOT NULL
    AND deleted = FALSE;
 
 -- 추가 데이터 검색을 위한 GIN 인덱스
@@ -201,10 +201,10 @@ CREATE TABLE IF NOT EXISTS audt.compliances
     -- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'DRAFT',                	-- 보고서 상태 (DRAFT/PENDING_REVIEW/APPROVED/PUBLISHED)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT fk_compliances__generated_by 			FOREIGN KEY (generated_by) REFERENCES tnnt.users(id)	ON DELETE CASCADE,
-	
+
     CONSTRAINT ck_compliances__report_type 				CHECK (report_type IN ('GDPR', 'SOX', 'HIPAA', 'ISO27001', 'PCI_DSS', 'CCPA', 'CUSTOM')),
     CONSTRAINT ck_compliances__compliance_status 		CHECK (compliance_status IN ('COMPLIANT', 'NON_COMPLIANT', 'PARTIAL', 'PENDING')),
     CONSTRAINT ck_compliances__scope 					CHECK (scope IN ('ALL_TENANTS', 'SPECIFIC_TENANT', 'SYSTEM_WIDE')),
@@ -324,40 +324,40 @@ CREATE TABLE IF NOT EXISTS audt.policies
     created_by                  UUID,                                                              	-- 보안 정책 생성자 UUID (관리자)
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 보안 정책 수정 일시
     updated_by                  UUID,                                                              	-- 보안 정책 수정자 UUID
-    
+
 	-- 정책 기본 정보
     policy_name                 VARCHAR(200)             NOT NULL,                                 	-- 정책 이름
     policy_type                 VARCHAR(50)              NOT NULL,                                 	-- 정책 유형 (PASSWORD/ACCESS_CONTROL/DATA_RETENTION/ENCRYPTION)
     policy_category             VARCHAR(50)              NOT NULL,                                 	-- 정책 분류 (AUTHENTICATION/AUTHORIZATION/DATA_PROTECTION/MONITORING)
-    
+
 	-- 정책 상세 내용
     description                 TEXT,                                                              	-- 정책 설명
     rules                       JSONB                    NOT NULL,                                 	-- 정책 규칙 (JSON 형태)
-    
+
 	-- 정책 적용 범위
     apply_to_all_tenants        BOOLEAN                  DEFAULT TRUE,                            	-- 전체 테넌트 적용 여부
     tenant_ids                  UUID[],                                                            	-- 특정 테넌트만 적용하는 경우 테넌트 ID 배열
-    
+
 	-- 정책 시행 정보
     effective_date              DATE                     NOT NULL,                                 	-- 정책 시행 시작일
     expiry_date                 DATE,                                                             	-- 정책 만료일 (NULL: 무기한)
     enforcement_level           VARCHAR(20)              NOT NULL DEFAULT 'MANDATORY',            	-- 시행 수준 (MANDATORY/RECOMMENDED/OPTIONAL)
-    
+
 	-- 버전 관리
     version                     VARCHAR(20)              NOT NULL,                                 	-- 정책 버전
     previous_version_id         UUID,                                                              	-- 이전 버전 참조
-    
+
 	-- 승인 정보
     approved_at                 TIMESTAMP WITH TIME ZONE,                                          	-- 정책 승인 일시
     approved_by                 VARCHAR(100),                                                      	-- 승인자 (보안 관리자, CISO 등)
-    
+
 	-- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'DRAFT',                	-- 정책 상태 (DRAFT/PENDING_APPROVAL/ACTIVE/ARCHIVED)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT fk_policies__previous_version_id 		FOREIGN KEY (previous_version_id) REFERENCES audt.policies(id)	ON DELETE CASCADE,
-	
+
     CONSTRAINT ck_policies__policy_type 				CHECK (policy_type IN ('PASSWORD', 'ACCESS_CONTROL', 'DATA_RETENTION', 'ENCRYPTION', 'AUTHENTICATION', 'NETWORK_SECURITY')),
     CONSTRAINT ck_policies__policy_category 			CHECK (policy_category IN ('AUTHENTICATION', 'AUTHORIZATION', 'DATA_PROTECTION', 'MONITORING', 'INCIDENT_RESPONSE', 'COMPLIANCE')),
     CONSTRAINT ck_policies__enforcement_level 			CHECK (enforcement_level IN ('MANDATORY', 'RECOMMENDED', 'OPTIONAL')),

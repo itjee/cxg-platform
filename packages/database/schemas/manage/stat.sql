@@ -17,46 +17,46 @@ CREATE TABLE IF NOT EXISTS stat.tenant_stats
     created_by                  UUID,                                                              	-- 분석 데이터 생성자 UUID (시스템 또는 분석 엔진)
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 분석 데이터 수정 일시
     updated_by                  UUID,                                                              	-- 분석 데이터 수정자 UUID
-    
+
 	-- 분석 대상
     tenant_id                   UUID                     NOT NULL,                                 	-- 분석 대상 테넌트 ID
-    
+
 	-- 분석 기간 정보
     analysis_date               DATE                     NOT NULL,                                 	-- 분석 기준일
     analysis_period             VARCHAR(20)              NOT NULL DEFAULT 'DAILY',                	-- 분석 주기 (DAILY/WEEKLY/MONTHLY/YEARLY)
-    
+
 	-- 사용자 활동 지표
     active_users_count          INTEGER                  DEFAULT 0,                               	-- 활성 사용자 수 (해당 기간 중 로그인한 사용자)
     new_users_count             INTEGER                  DEFAULT 0,                               	-- 신규 사용자 수 (해당 기간 중 신규 가입)
     login_count                 INTEGER                  DEFAULT 0,                               	-- 총 로그인 횟수
     avg_session_duration        NUMERIC(18,4)            DEFAULT 0,                               	-- 평균 세션 시간 (분 단위)
-    
+
 	-- 기능 사용 지표
     api_calls_count             INTEGER                  DEFAULT 0,                               	-- API 호출 총 횟수
     uploads_count               INTEGER                  DEFAULT 0,                               	-- 문서 업로드 횟수
     executions_count            INTEGER                  DEFAULT 0,                               	-- 워크플로우/작업 실행 횟수
     ai_requests_count           INTEGER                  DEFAULT 0,                               	-- AI 서비스 요청 횟수
-    
+
 	-- 스토리지 사용량 지표
     used_storage             	NUMERIC(18,4)            DEFAULT 0,                               	-- 사용 중인 스토리지 (GB 단위)
     grow_storage           		NUMERIC(18,4)            DEFAULT 0,                               	-- 스토리지 증가량 (GB 단위)
-    
+
 	-- 성능 지표
     avg_response_time        	NUMERIC(18,4)            DEFAULT 0,                               	-- 평균 응답 시간 (밀리초)
     error_rate          		NUMERIC(5,2)             DEFAULT 0,                               	-- 오류율 (0-100%)
     uptime_rate         		NUMERIC(5,2)             DEFAULT 100,                             	-- 가동률 (0-100%)
-    
+
 	-- 비즈니스 지표
     feature_adoption_rate       NUMERIC(5,2)             DEFAULT 0,                               	-- 신규 기능 도입률 (0-100%)
     user_satisfaction_score     NUMERIC(3,1),                                                     	-- 사용자 만족도 점수 (1-5점)
-    
+
 	-- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'ACTIVE',              	-- 분석 데이터 상태 (ACTIVE/ARCHIVED/OBSOLETE)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT fk_tenant_stats__tenant_id 				FOREIGN KEY (tenant_id) REFERENCES tnnt.tenants(id)	ON DELETE CASCADE,
-	
+
     CONSTRAINT ck_tenant_stats__analysis_period 		CHECK (analysis_period IN ('DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY')),
     CONSTRAINT ck_tenant_stats__status 					CHECK (status IN ('ACTIVE', 'ARCHIVED', 'OBSOLETE')),
     CONSTRAINT ck_tenant_stats__active_users_count 		CHECK (active_users_count >= 0),
@@ -179,45 +179,45 @@ CREATE TABLE IF NOT EXISTS stat.usage_stats
     created_by                  UUID,                                                              	-- 사용량 요약 생성자 UUID (시스템 또는 분석 엔진)
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 사용량 요약 수정 일시
     updated_by                  UUID,                                                              	-- 사용량 요약 수정자 UUID
-    
+
 	-- 요약 대상
     tenant_id                   UUID,                                                              	-- 테넌트 ID (NULL인 경우 전체 플랫폼 통계)
-    
+
 	-- 요약 기간 정보
     summary_date                DATE                     NOT NULL,                                 	-- 요약 기준일
     summary_type                VARCHAR(20)              NOT NULL,                                 	-- 요약 주기 (DAILY/WEEKLY/MONTHLY/QUARTERLY/YEARLY)
-    
+
 	-- 사용자 통계
     total_users                 INTEGER                  DEFAULT 0,                               	-- 총 사용자 수
     active_users                INTEGER                  DEFAULT 0,                               	-- 활성 사용자 수
     new_users                   INTEGER                  DEFAULT 0,                               	-- 신규 사용자 수
     churned_users               INTEGER                  DEFAULT 0,                               	-- 이탈 사용자 수
-    
+
 	-- 활동 통계
     total_logins                INTEGER                  DEFAULT 0,                               	-- 총 로그인 횟수
     total_api_calls             INTEGER                  DEFAULT 0,                               	-- 총 API 호출 횟수
     total_ai_requests           INTEGER                  DEFAULT 0,                               	-- 총 AI 요청 횟수
     total_storage_used       	NUMERIC(18,4)            DEFAULT 0,                               	-- 총 스토리지 사용량 (GB)
-    
+
 	-- 비즈니스 통계
     revenue              		NUMERIC(18,4)            DEFAULT 0,                               	-- 매출액
     churn_rate          		NUMERIC(5,2)             DEFAULT 0,                               	-- 고객 이탈률 (%)
     acquisition_cost   			NUMERIC(18,4)            DEFAULT 0,                               	-- 고객 획득 비용 (CAC)
     lifetime_value              NUMERIC(18,4)            DEFAULT 0,                               	-- 고객 생애 가치 (CLV)
-    
+
 	-- 성능 통계
     avg_response_time        	NUMERIC(18,4)            DEFAULT 0,                               	-- 평균 응답 시간 (밀리초)
     error_count                 INTEGER                  DEFAULT 0,                               	-- 오류 발생 횟수
     uptime_minutes              INTEGER                  DEFAULT 0,                               	-- 정상 가동 시간 (분)
     downtime_minutes            INTEGER                  DEFAULT 0,                               	-- 장애 시간 (분)
-    
+
 	-- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'ACTIVE',              	-- 요약 데이터 상태 (ACTIVE/ARCHIVED/RECALCULATING)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT fk_usage_stats__tenant_id 				FOREIGN KEY (tenant_id) REFERENCES tnnt.tenants(id)	ON DELETE CASCADE,
-	
+
     CONSTRAINT ck_usage_stats__summary_type 			CHECK (summary_type IN ('DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY')),
     CONSTRAINT ck_usage_stats__status 					CHECK (status IN ('ACTIVE', 'ARCHIVED', 'RECALCULATING')),
     CONSTRAINT ck_usage_stats__total_users 				CHECK (total_users >= 0),

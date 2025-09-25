@@ -3,7 +3,7 @@
 -- ============================================================================
 CREATE SCHEMA IF NOT EXISTS supt;
 
-COMMENT ON SCHEMA supt 
+COMMENT ON SCHEMA supt
 IS 'SUPT: 지원/고객 커뮤니케이션 스키마: 고객지원 및 VOC 전용 데이터.';
 
 -- ============================================================================
@@ -45,11 +45,11 @@ CREATE TABLE IF NOT EXISTS supt.tickets
     -- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'OPEN',                 	-- 티켓 상태 (OPEN/IN_PROGRESS/PENDING_CUSTOMER/RESOLVED/CLOSED)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT fk_tickets__tenant_id 					FOREIGN KEY (tenant_id) REFERENCES tnnt.tenants(id)	ON DELETE CASCADE,
     CONSTRAINT fk_tickets__user_id 						FOREIGN KEY (user_id) 	REFERENCES tnnt.users(id)	ON DELETE CASCADE,
-	
+
     CONSTRAINT ck_tickets__category 					CHECK (category IN ('TECHNICAL', 'BILLING', 'FEATURE_REQUEST', 'BUG_REPORT', 'GENERAL', 'ACCOUNT_ISSUE')),
     CONSTRAINT ck_tickets__priority 					CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')),
     CONSTRAINT ck_tickets__sla_level 					CHECK (sla_level IN ('BASIC', 'STANDARD', 'PREMIUM', 'ENTERPRISE')),
@@ -95,77 +95,77 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_tickets__ticket_no
 	ON supt.tickets (ticket_no)
  WHERE deleted = FALSE;
 
--- 테넌트별 티켓 조회 최적화 
+-- 테넌트별 티켓 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__tenant_id
 	ON supt.tickets (tenant_id, created_at DESC)
  WHERE deleted = FALSE;
 
--- 사용자별 티켓 조회 최적화 
+-- 사용자별 티켓 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__user_id
 	ON supt.tickets (user_id, created_at DESC)
  WHERE user_id IS NOT NULL
    AND deleted = FALSE;
 
--- 상태별 티켓 조회 최적화  
+-- 상태별 티켓 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__status
 	ON supt.tickets (status, created_at DESC)
  WHERE deleted = FALSE;
 
--- 카테고리별 티켓 조회 최적화 
+-- 카테고리별 티켓 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__category
 	ON supt.tickets (category, created_at DESC)
  WHERE deleted = FALSE;
 
--- 우선순위별 티켓 조회 최적화 
+-- 우선순위별 티켓 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__priority
 	ON supt.tickets (priority, created_at DESC)
  WHERE deleted = FALSE;
 
--- 담당자별 티켓 조회 최적화 
+-- 담당자별 티켓 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__assigned_to
 	ON supt.tickets (assigned_to, status, created_at DESC)
- WHERE assigned_to IS NOT NULL 
+ WHERE assigned_to IS NOT NULL
    AND deleted = FALSE;
 
--- SLA 수준별 티켓 조회 최적화   
+-- SLA 수준별 티켓 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__sla_level
 	ON supt.tickets (sla_level, created_at DESC)
  WHERE deleted = FALSE;
 
--- 진행중인 티켓 조회 최적화 
+-- 진행중인 티켓 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__open_tickets
 	ON supt.tickets (status, priority, created_at DESC)
  WHERE status IN ('OPEN', 'IN_PROGRESS')
    AND deleted = FALSE;
 
--- 긴급 티켓 조회 최적화   
+-- 긴급 티켓 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__urgent_tickets
 	ON supt.tickets (priority, created_at DESC)
  WHERE priority = 'URGENT'
    AND status != 'CLOSED'
    AND deleted = FALSE;
 
--- SLA 추적 최적화   
+-- SLA 추적 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__sla_tracking
 	ON supt.tickets (first_response_due, resolution_due, created_at DESC)
  WHERE status NOT IN ('RESOLVED', 'CLOSED')
    AND deleted = FALSE;
-   
+
 --CREATE INDEX IF NOT EXISTS ix_tickets__overdue_response 		ON supt.tickets (first_response_due, first_response_at) WHERE first_response_at IS NULL AND first_response_due < NOW() AND deleted = FALSE;	-- 응답 지연 티켓 조회 최적화
 --CREATE INDEX IF NOT EXISTS ix_tickets__overdue_resolution 		ON supt.tickets (resolution_due, resolved_at) WHERE resolved_at IS NULL AND resolution_due < NOW() AND deleted = FALSE; 						-- 해결 지연 티켓 조회 최적화
 
 -- 만족도 분석 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__customer_satisfaction
  	ON supt.tickets (customer_rating DESC, created_at DESC)
- WHERE customer_rating IS NOT NULL 
+ WHERE customer_rating IS NOT NULL
    AND deleted = FALSE;
-   
--- 연락처로 티켓 검색 최적화   
+
+-- 연락처로 티켓 검색 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__contact_email
 	ON supt.tickets (contact_email)
  WHERE deleted = FALSE;
 
--- 생성 시간 기준 조회 최적화 
+-- 생성 시간 기준 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_tickets__created_at
 	ON supt.tickets (created_at DESC);
 
@@ -181,31 +181,31 @@ CREATE TABLE IF NOT EXISTS supt.ticket_comments
     created_by                  UUID,                                                              	-- 댓글 생성자 UUID (사용자 또는 시스템)
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 댓글 수정 일시
     updated_by                  UUID,                                                              	-- 댓글 수정자 UUID
-    
+
 	-- 관련 엔티티 연결
     ticket_id                   UUID                     NOT NULL,                                 	-- 소속 티켓 ID
     user_id                     UUID,                                                              	-- 댓글 작성자 ID (고객 또는 지원팀원)
-    
+
 	-- 댓글 내용 정보
     comment_text                TEXT                     NOT NULL,                                 	-- 댓글 본문 내용
     comment_type                VARCHAR(20)              NOT NULL DEFAULT 'COMMENT',              	-- 댓글 유형 (COMMENT/INTERNAL_NOTE/STATUS_CHANGE/RESOLUTION)
     is_internal                 BOOLEAN                  DEFAULT FALSE,                           	-- 내부 댓글 여부 (고객에게 비공개)
-    
+
 	-- 첨부파일 정보
     files           	 		JSONB                    DEFAULT '[]',                            	-- 첨부 파일 목록 (JSON 배열)
-    
+
 	-- 자동화 정보
     automated                	BOOLEAN                  DEFAULT FALSE,                           	-- 시스템 자동 생성 여부
     automation_source           VARCHAR(50),                                                       	-- 자동화 소스 (EMAIL/CHATBOT/WORKFLOW/API)
-    
+
 	-- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'ACTIVE',              	-- 댓글 상태 (ACTIVE/HIDDEN/DELETED)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT fk_ticket_comments__ticket_id 				FOREIGN KEY (ticket_id) REFERENCES supt.tickets(id)	ON DELETE CASCADE,
     CONSTRAINT fk_ticket_comments__user_id 					FOREIGN KEY (user_id) 	REFERENCES tnnt.users(id)	ON DELETE CASCADE,
-	
+
     CONSTRAINT ck_ticket_comments__comment_type 			CHECK (comment_type IN ('COMMENT', 'INTERNAL_NOTE', 'STATUS_CHANGE', 'RESOLUTION', 'SYSTEM_UPDATE')),
     CONSTRAINT ck_ticket_comments__automation_source 		CHECK (automation_source IN ('EMAIL', 'CHATBOT', 'WORKFLOW', 'API', 'ESCALATION', 'SLA_ALERT')),
     CONSTRAINT ck_ticket_comments__status 					CHECK (status IN ('ACTIVE', 'HIDDEN', 'DELETED')),
@@ -297,42 +297,42 @@ CREATE TABLE IF NOT EXISTS supt.feedbacks
     created_by                  UUID,                                                              	-- 피드백 생성자 UUID (고객 또는 시스템)
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 피드백 수정 일시
     updated_by                  UUID,                                                              	-- 피드백 수정자 UUID
-    
+
 	-- 피드백 제공자 정보
     tenant_id                   UUID                     NOT NULL,                                 	-- 피드백 제공 테넌트 ID
     user_id                     UUID,                                                              	-- 피드백 제공자 사용자 ID
-    
+
 	-- 피드백 기본 정보
     feedback_type               VARCHAR(50)              NOT NULL,                                 	-- 피드백 유형 (FEATURE_REQUEST/BUG_REPORT/IMPROVEMENT/COMPLIMENT/COMPLAINT)
     title                       VARCHAR(200)             NOT NULL,                                 	-- 피드백 제목
     description                 TEXT                     NOT NULL,                                 	-- 피드백 상세 내용
-    
+
 	-- 만족도 평가 정보
     overall_rating              INTEGER,                                                           	-- 전체 만족도 (1-5점)
     feature_ratings             JSONB                    DEFAULT '{}',                            	-- 기능별 상세 평점 (JSON 형태)
-    
+
 	-- 피드백 분류 정보
     product_area                VARCHAR(50),                                                       	-- 관련 제품 영역 (UI, API, DATABASE 등)
     urgency               		VARCHAR(20)              DEFAULT 'MEDIUM',                        	-- 긴급도 (LOW/MEDIUM/HIGH)
-    
+
 	-- 검토 및 처리 정보
     reviewed_by                 VARCHAR(100),                                                      	-- 피드백 검토자 (제품 관리자, 개발팀 등)
     reviewed_at                 TIMESTAMP WITH TIME ZONE,                                          	-- 검토 완료 일시
     implement_priority     		INTEGER,                                                           	-- 구현 우선순위 (1-10, 1이 최고 우선순위)
     implement_status       		VARCHAR(20)              DEFAULT 'SUBMITTED',                     	-- 구현 상태 (SUBMITTED/REVIEWING/PLANNED/IN_PROGRESS/COMPLETED/REJECTED)
-    
+
 	-- 고객 응답 정보
     response_message            TEXT,                                                              	-- 피드백에 대한 회사 측 응답
     response_sent_at            TIMESTAMP WITH TIME ZONE,                                          	-- 응답 발송 일시
-    
+
 	-- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'ACTIVE',              	-- 피드백 상태 (ACTIVE/ARCHIVED/SPAM)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT fk_feedbacks__tenant_id 					FOREIGN KEY (tenant_id) REFERENCES tnnt.tenants(id)	ON DELETE CASCADE,
     CONSTRAINT fk_feedbacks__user_id 					FOREIGN KEY (user_id) 	REFERENCES tnnt.users(id)	ON DELETE CASCADE,
-	
+
     CONSTRAINT ck_feedbacks__feedback_type 				CHECK (feedback_type IN ('FEATURE_REQUEST', 'BUG_REPORT', 'IMPROVEMENT', 'COMPLIMENT', 'COMPLAINT', 'GENERAL')),
     CONSTRAINT ck_feedbacks__urgency 					CHECK (urgency IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
     CONSTRAINT ck_feedbacks__implement_status 			CHECK (implement_status IN ('SUBMITTED', 'REVIEWING', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'REJECTED', 'DEFERRED')),

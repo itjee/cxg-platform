@@ -1,6 +1,6 @@
-import strawberry
-from typing import List, Optional
 from datetime import datetime
+
+import strawberry
 
 
 @strawberry.type
@@ -43,17 +43,17 @@ class AuthPayload:
 @strawberry.type
 class Query:
     @strawberry.field
-    def users(self) -> List[User]:
+    def users(self) -> list[User]:
         # TODO: 실제 데이터베이스에서 사용자 조회
         return []
 
     @strawberry.field
-    def user(self, id: str) -> Optional[User]:
+    def user(self, id: str) -> User | None:
         # TODO: 실제 데이터베이스에서 특정 사용자 조회
         return None
 
     @strawberry.field
-    def tenants(self) -> List[Tenant]:
+    def tenants(self) -> list[Tenant]:
         # TODO: 실제 데이터베이스에서 테넌트 조회
         return []
 
@@ -62,8 +62,8 @@ class Query:
 class Mutation:
     @strawberry.field
     def create_user(self, input: CreateUserInput) -> User:
-        from src.core.security import get_password_hash
         from src.api.v1.endpoints.auth import fake_users_db
+        from src.core.security import get_password_hash
 
         # 이메일 중복 체크
         if input.email in fake_users_db:
@@ -89,26 +89,31 @@ class Mutation:
             email=input.email,
             username=input.username,
             created_at=datetime.now(),
-            is_active=True
+            is_active=True,
         )
 
     @strawberry.field
     def login(self, input: LoginInput) -> AuthPayload:
-        from src.core.security import verify_password, create_access_token
-        from src.api.v1.endpoints.auth import fake_users_db
         from datetime import timedelta
+
+        from src.api.v1.endpoints.auth import fake_users_db
         from src.core.config import settings
+        from src.core.security import create_access_token, verify_password
 
         # 사용자 인증
         user_data = fake_users_db.get(input.email)
-        if not user_data or not verify_password(input.password, user_data["hashed_password"]):
+        if not user_data or not verify_password(
+            input.password, user_data["hashed_password"]
+        ):
             raise Exception("이메일 또는 비밀번호가 올바르지 않습니다")
 
         # 토큰 생성
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token_expires = timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
         access_token = create_access_token(
             data={"sub": user_data["email"]},
-            expires_delta=access_token_expires
+            expires_delta=access_token_expires,
         )
 
         user = User(
@@ -116,13 +121,10 @@ class Mutation:
             email=user_data["email"],
             username=user_data.get("username", user_data.get("name", "")),
             created_at=datetime.fromisoformat(user_data["created_at"]),
-            is_active=user_data["is_active"]
+            is_active=user_data["is_active"],
         )
 
-        return AuthPayload(
-            access_token=access_token,
-            user=user
-        )
+        return AuthPayload(access_token=access_token, user=user)
 
 
 schema = strawberry.Schema(query=Query, mutation=Mutation)

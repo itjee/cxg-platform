@@ -3,7 +3,7 @@
 -- ============================================================================
 CREATE SCHEMA IF NOT EXISTS ifra;
 
-COMMENT ON SCHEMA ifra 
+COMMENT ON SCHEMA ifra
 IS 'IFRA: 인프라/리소스 관리 스키마: 클라우드/온프레미스 리소스 카탈로그 및 사용량 메트릭(리소스 단위)을 관리. 비용/용량 계획의 근거 데이터.';
 
 -- ============================================================================
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS ifra.resources
     created_by          UUID,							                                 	-- 리소스 등록자 UUID
     updated_at          TIMESTAMP WITH TIME ZONE,                                          	-- 리소스 수정 일시
     updated_by          UUID,                                                              	-- 리소스 수정자 UUID
-    
+
 	-- 테넌트 연결 (멀티테넌시)
     tenant_id           UUID,                                                              	-- 테넌트 식별자 (NULL: 공통 리소스)
     -- 리소스 기본 정보
@@ -25,33 +25,33 @@ CREATE TABLE IF NOT EXISTS ifra.resources
     resource_name       VARCHAR(100)             NOT NULL,                                 	-- 사용자 정의 리소스 이름
     resource_arn        VARCHAR(500),                                                      	-- 클라우드 리소스 ARN/Resource ID
     resource_id         VARCHAR(100)             NOT NULL,                                 	-- 클라우드 제공업체 리소스 식별자
-    
+
 	-- 리소스 위치 정보
     region              VARCHAR(50)              NOT NULL DEFAULT 'ap-northeast-2',       	-- 클라우드 리전 (기본: 서울)
     availability_zone   VARCHAR(50),                                                      	-- 가용영역 (예: ap-northeast-2a)
-    
+
 	-- 리소스 스펙 정보
     instance_type       VARCHAR(50),                                                      	-- 인스턴스 타입 (예: t3.medium, Standard_D2s_v3)
     cpu_cores           INTEGER,                                                          	-- CPU 코어 수
     memory_size         INTEGER,                                                          	-- 메모리 크기 (MB 단위)
     storage_size        INTEGER,                                                          	-- 스토리지 크기 (GB 단위)
-    
+
 	-- 비용 관리 정보
     hourly_cost         NUMERIC(18,4),                                                    	-- 시간당 비용
     monthly_cost        NUMERIC(18,4),                                                    	-- 월간 예상 비용
     currency            CHAR(3)                  NOT NULL DEFAULT 'USD',                 	-- 통화 단위 (USD/KRW/EUR/JPY)
-    
+
 	-- 확장 가능한 메타데이터
     tags                JSONB                    DEFAULT '{}',                            	-- 리소스 태그 (JSON 형태)
     configuration       JSONB                    DEFAULT '{}',                             	-- 리소스 설정 정보 (JSON 형태),
-	
+
 	-- 리소스 상태 관리
     status              VARCHAR(20)              NOT NULL DEFAULT 'PROVISIONING',         	-- 리소스 상태 (PROVISIONING/RUNNING/STOPPED/TERMINATED/ERROR/MAINTENANCE)
     deleted          	BOOLEAN                  NOT NULL DEFAULT FALSE,                  	-- 논리적 삭제 플래그
-    
+
 	-- 외래키 제약조건
     CONSTRAINT fk_resources__tenant_id 			FOREIGN KEY (tenant_id) REFERENCES tnnt.tenants(id)	ON DELETE CASCADE,
-    
+
 	-- 체크 제약조건
     CONSTRAINT ck_resources__resource_type 		CHECK (resource_type IN ('DATABASE', 'STORAGE', 'COMPUTE', 'NETWORK', 'CACHE', 'LOAD_BALANCER', 'CDN')),
     CONSTRAINT ck_resources__status        		CHECK (status IN ('PROVISIONING', 'RUNNING', 'STOPPED', 'TERMINATED', 'ERROR', 'MAINTENANCE')),
@@ -92,62 +92,62 @@ COMMENT ON COLUMN ifra.resources.deleted 			IS '삭제 여부 - 논리적 삭제
 
 -- 인덱스 생성
 -- 클라우드 리소스 ID로 빠른 검색
-CREATE UNIQUE INDEX IF NOT EXISTS ux_resources__resource_id 
-    ON ifra.resources (resource_id) 
+CREATE UNIQUE INDEX IF NOT EXISTS ux_resources__resource_id
+    ON ifra.resources (resource_id)
  WHERE deleted = FALSE;
 
 -- 테넌트별 리소스 조회 최적화
-CREATE INDEX IF NOT EXISTS ix_resources__tenant_id 			
+CREATE INDEX IF NOT EXISTS ix_resources__tenant_id
     ON ifra.resources (tenant_id);
 
 -- 리소스 타입별 조회 최적화
-CREATE INDEX IF NOT EXISTS ix_resources__resource_type 		
+CREATE INDEX IF NOT EXISTS ix_resources__resource_type
     ON ifra.resources (resource_type);
-    
+
 -- 리소스 상태별 조회 최적화 (삭제되지 않은 리소스만)
-CREATE INDEX IF NOT EXISTS ix_resources__status_active 		
-    ON ifra.resources (status) 
+CREATE INDEX IF NOT EXISTS ix_resources__status_active
+    ON ifra.resources (status)
  WHERE deleted = FALSE;
-    
+
 -- 리전별 리소스 관리를 위한 인덱스
-CREATE INDEX IF NOT EXISTS ix_resources__region 			
+CREATE INDEX IF NOT EXISTS ix_resources__region
     ON ifra.resources (region);
-    
+
 -- 테넌트 + 리소스 타입 복합 조회 최적화
-CREATE INDEX IF NOT EXISTS ix_resources__tenant_type 		
-    ON ifra.resources (tenant_id, resource_type) 
- WHERE deleted = FALSE;					
-    
--- 비용 관리를 위한 인덱스 (월간 비용 높은 순 조회)
-CREATE INDEX IF NOT EXISTS ix_resources__monthly_cost 		
-    ON ifra.resources (monthly_cost DESC NULLS LAST) 
+CREATE INDEX IF NOT EXISTS ix_resources__tenant_type
+    ON ifra.resources (tenant_id, resource_type)
  WHERE deleted = FALSE;
-    
+
+-- 비용 관리를 위한 인덱스 (월간 비용 높은 순 조회)
+CREATE INDEX IF NOT EXISTS ix_resources__monthly_cost
+    ON ifra.resources (monthly_cost DESC NULLS LAST)
+ WHERE deleted = FALSE;
+
 -- ARN으로 리소스 검색 (AWS 환경)
-CREATE INDEX IF NOT EXISTS ix_resources__resource_arn 		
-    ON ifra.resources (resource_arn) 
- WHERE resource_arn IS NOT NULL AND deleted = FALSE;	
-    
+CREATE INDEX IF NOT EXISTS ix_resources__resource_arn
+    ON ifra.resources (resource_arn)
+ WHERE resource_arn IS NOT NULL AND deleted = FALSE;
+
 -- 생성일시 기준 최신 리소스 조회 최적화
-CREATE INDEX IF NOT EXISTS ix_resources__created_at 		
+CREATE INDEX IF NOT EXISTS ix_resources__created_at
     ON ifra.resources (created_at DESC);
-    
+
 -- 태그 기반 리소스 검색을 위한 GIN 인덱스
-CREATE INDEX IF NOT EXISTS ix_resources__tags 				
+CREATE INDEX IF NOT EXISTS ix_resources__tags
     ON ifra.resources USING GIN (tags);
-    
+
 -- 설정 정보 검색을 위한 GIN 인덱스
-CREATE INDEX IF NOT EXISTS ix_resources__configuration 		
+CREATE INDEX IF NOT EXISTS ix_resources__configuration
     ON ifra.resources USING GIN (configuration);
-    
+
 -- 리소스 이름으로 검색 최적화 (부분 검색 지원)
-CREATE INDEX IF NOT EXISTS ix_resources__resource_name 		
+CREATE INDEX IF NOT EXISTS ix_resources__resource_name
     ON ifra.resources (resource_name);
-    
+
 -- 인스턴스 타입별 리소스 분석용 인덱스
-CREATE INDEX IF NOT EXISTS ix_resources__instance_type 		
-    ON ifra.resources (instance_type) 
-    WHERE instance_type IS NOT NULL AND deleted = FALSE;    
+CREATE INDEX IF NOT EXISTS ix_resources__instance_type
+    ON ifra.resources (instance_type)
+    WHERE instance_type IS NOT NULL AND deleted = FALSE;
 
 
 -- ============================================================================
@@ -161,24 +161,24 @@ CREATE TABLE IF NOT EXISTS ifra.resource_usages
     created_by          		UUID,                                 								-- 메트릭 수집 시스템 UUID
     updated_at          		TIMESTAMP WITH TIME ZONE,                   						-- 메트릭 수정 일시
     updated_by          		UUID,                                 								-- 메트릭 수정 시스템 UUID
-    
+
 	-- 리소스 연결
     resource_id         		UUID                     NOT NULL,                                 	-- 대상 리소스 ID (resources 참조)
     tenant_id           		UUID,                                                              	-- 테넌트 ID (공통 리소스의 경우 NULL)
-    
+
 	-- 메트릭 정보
     metric_name         		VARCHAR(50)              NOT NULL,                                 	-- 메트릭 이름 (CPU_UTILIZATION/MEMORY_USAGE/DISK_USAGE/NETWORK_IN/NETWORK_OUT)
     metric_value        		NUMERIC(18,4)            NOT NULL,                                 	-- 메트릭 측정값
     metric_unit        	 		VARCHAR(20)              NOT NULL,                                 	-- 메트릭 단위 (PERCENT/BYTES/COUNT/MBPS)
-    
+
 	-- 시간 정보
     measure_time    			TIMESTAMP WITH TIME ZONE NOT NULL,                                 	-- 실제 측정 시점
     summary_period  			VARCHAR(20)              NOT NULL DEFAULT 'HOURLY',              	-- 집계 주기 (MINUTE/HOURLY/DAILY/MONTHLY)
-    
+
 	-- 제약조건
     CONSTRAINT fk_resource_usages__resource_id 			FOREIGN KEY (resource_id) 	REFERENCES ifra.resources(id)	ON DELETE CASCADE,
     CONSTRAINT fk_resource_usages__tenant_id 			FOREIGN KEY (tenant_id) 	REFERENCES tnnt.tenants(id)		ON DELETE CASCADE,
-	
+
     CONSTRAINT ck_resource_usages__summary_period 		CHECK (summary_period IN ('MINUTE', 'HOURLY', 'DAILY', 'MONTHLY')),
     CONSTRAINT ck_resource_usages__metric_name 			CHECK (metric_name IN ('CPU_UTILIZATION', 'MEMORY_USAGE', 'DISK_USAGE', 'NETWORK_IN', 'NETWORK_OUT', 'IOPS', 'LATENCY')),
     CONSTRAINT ck_resource_usages__metric_unit 			CHECK (metric_unit IN ('PERCENT', 'BYTES', 'COUNT', 'MBPS', 'MILLISECONDS')),

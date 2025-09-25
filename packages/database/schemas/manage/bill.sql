@@ -3,7 +3,7 @@
 -- ============================================================================
 CREATE SCHEMA IF NOT EXISTS bill;
 
-COMMENT ON SCHEMA bill 
+COMMENT ON SCHEMA bill
 IS 'BILL: 요금/청구 스키마: 과금 기준과 청구/결제 이력을 관리. 회계/세무 대응 고려.';
 
 -- ============================================================================
@@ -17,38 +17,38 @@ CREATE TABLE IF NOT EXISTS bill.plans
     created_by                  UUID,                                                              	-- 요금제 생성자 UUID (관리자)
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 요금제 수정 일시
     updated_by                  UUID,                                                              	-- 요금제 수정자 UUID
-    
+
 	-- 요금제 기본 정보
     plan_code                   VARCHAR(50)              NOT NULL,		                          	-- 요금제 식별 코드 (PLAN_TRIAL, PLAN_STD 등)
     plan_name                   VARCHAR(100)             NOT NULL,                                 	-- 요금제 이름 (체험판, 스탠다드, 프리미엄 등)
     plan_type                   VARCHAR(20)              NOT NULL DEFAULT 'STANDARD',             	-- 요금제 유형 (TRIAL/STANDARD/PREMIUM/ENTERPRISE)
     description                 TEXT,                                                              	-- 요금제 상세 설명
-    
+
 	-- 가격 정보
     base_price                  NUMERIC(18,4)            NOT NULL,                                 	-- 기본 요금 (월/분기/년 단위)
     user_price                  NUMERIC(18,4)            DEFAULT 0,                               	-- 사용자당 추가 요금
     currency                    CHAR(3)                  NOT NULL DEFAULT 'KRW',                  	-- 통화 단위 (ISO 4217)
     billing_cycle               VARCHAR(20)              NOT NULL DEFAULT 'MONTHLY',              	-- 청구 주기 (MONTHLY/QUARTERLY/YEARLY)
-    
+
 	-- 사용량 제한 정보
     max_users                   INTEGER                  DEFAULT 50,                              	-- 최대 사용자 수 제한
     max_storage                 INTEGER                  DEFAULT 100,                             	-- 최대 스토리지 용량 (GB)
     max_api_calls               INTEGER                  DEFAULT 10000,                           	-- 월간 최대 API 호출 수
-    
+
 	-- 기능 제한 정보
     features                    JSONB                    DEFAULT '{}',                            	-- 포함된 기능 목록 (JSON 형태)
-    
-	-- 유효 기간 관리    
+
+	-- 유효 기간 관리
 	start_time                  DATE                     NOT NULL,                                 	-- 요금제 적용 시작일
     close_time                    DATE,                                                             -- 요금제 적용 종료일 (NULL: 무기한)
-    
+
 	-- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'ACTIVE',              	-- 요금제 상태 (ACTIVE/INACTIVE/ARCHIVED)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
 	CONSTRAINT uk_plans__plan_code			UNIQUE (plan_code),
-	
+
     CONSTRAINT ck_plans__plan_type 			CHECK (plan_type IN ('TRIAL', 'STANDARD', 'PREMIUM', 'ENTERPRISE')),
     CONSTRAINT ck_plans__billing_cycle 		CHECK (billing_cycle IN ('MONTHLY', 'QUARTERLY', 'YEARLY')),
     CONSTRAINT ck_plans__status 			CHECK (status IN ('ACTIVE', 'INACTIVE', 'ARCHIVED')),
@@ -156,18 +156,18 @@ CREATE TABLE IF NOT EXISTS bill.invoices
     created_by                  UUID,                                                              	-- 청구서 생성자 UUID (시스템 또는 관리자)
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 청구서 수정 일시
     updated_by                  UUID,                                                              	-- 청구서 수정자 UUID
-    
+
 	-- 관련 테이블 연결
     tenant_id                   UUID                     NOT NULL,                                 	-- 청구 대상 테넌트 ID
     subscription_id             UUID                     NOT NULL,                                 	-- 구독 계약 ID
-    
+
 	-- 청구서 기본 정보
     invoice_no                  VARCHAR(50)              NOT NULL,		                          	-- 청구서 번호 (시스템 내 고유)
     invoice_date                DATE                     NOT NULL,                                 	-- 청구서 발행일
     due_date                    DATE                     NOT NULL,                                 	-- 결제 만료일
     start_date                  DATE                     NOT NULL,                                 	-- 청구 기간 시작일
     close_date                  DATE                     NOT NULL,                                 	-- 청구 기간 종료일
-    
+
 	-- 청구 금액 정보
     base_amount                 NUMERIC(18,4)            NOT NULL,                                 	-- 기본 구독 요금
     usage_amount                NUMERIC(18,4)            DEFAULT 0,                               	-- 사용량 기반 추가 요금 (초과 사용자, API 호출 등)
@@ -175,26 +175,26 @@ CREATE TABLE IF NOT EXISTS bill.invoices
     tax_amount                  NUMERIC(18,4)            DEFAULT 0,                               	-- 세금 (VAT, 부가세 등)
     total_amount                NUMERIC(18,4)            NOT NULL,                                	-- 총 청구 금액 (최종 결제 금액)
     currency                    CHAR(3)                  NOT NULL DEFAULT 'KRW',                  	-- 통화 단위 (ISO 4217)
-    
+
 	-- 사용량 상세 정보
     user_count                  INTEGER                  NOT NULL,                                	-- 청구 기간 중 평균/최대 사용자 수
     used_storage                NUMERIC(18,4)            DEFAULT 0,                               	-- 스토리지 사용량 (GB)
     api_calls                   INTEGER                  DEFAULT 0,                               	-- 총 API 호출 횟수
-    
+
 	-- 결제 정보
     paid_at                     TIMESTAMP WITH TIME ZONE,                                          	-- 결제 완료 일시
     payment_method              VARCHAR(50),                                                       	-- 결제 수단 (CREDIT_CARD/BANK_TRANSFER/PAYPAL 등)
-    
+
 	-- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'PENDING',              	-- 청구서 상태 (PENDING/SENT/PAID/OVERDUE/CANCELED)
     deleted                 	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT fk_invoices__tenant_id 			FOREIGN KEY (tenant_id) 		REFERENCES tnnt.tenants(id)			ON DELETE CASCADE,
     CONSTRAINT fk_invoices__subscription_id 	FOREIGN KEY (subscription_id) 	REFERENCES tnnt.subscriptions(id)	ON DELETE CASCADE,
-	
+
 	CONSTRAINT uk_invoices__invoice_no			UNIQUE (invoice_no),
-	
+
     CONSTRAINT ck_invoices__status 				CHECK (status IN ('PENDING', 'SENT', 'PAID', 'OVERDUE', 'CANCELED')),
     CONSTRAINT ck_invoices__payment_method 		CHECK (payment_method IN ('CREDIT_CARD', 'BANK_TRANSFER', 'PAYPAL', 'WIRE_TRANSFER', 'CHECK')),
     CONSTRAINT ck_invoices__base_amount 		CHECK (base_amount >= 0),
@@ -312,41 +312,41 @@ CREATE TABLE IF NOT EXISTS bill.transactions
     created_by                  UUID,                                                              	-- 거래 생성자 UUID (시스템 또는 관리자)
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 거래 수정 일시
     updated_by                  UUID,                                                              	-- 거래 수정자 UUID
-    
+
 	-- 관련 테이블 연결
     tenant_id                   UUID                     NOT NULL,                                 	-- 결제 주체 테넌트 ID
     invoice_id                  UUID,                                                              	-- 연관 청구서 ID (청구서 결제인 경우)
-	
+
     -- 거래 식별 정보 및 유형
     transaction_no              VARCHAR(100)             NOT NULL,                          		-- 거래 번호 (시스템 내 고유)
     transaction_type            VARCHAR(20)              NOT NULL DEFAULT 'PAYMENT',              	-- 거래 유형 (PAYMENT/REFUND/CHARGEBACK)
-	
+
     payment_gateway             VARCHAR(50),                                                       	-- 결제 게이트웨이 (STRIPE/PAYPAL/TOSS/KAKAOPAY 등)
     payment_gateway_id      	VARCHAR(255),                                                      	-- 결제 게이트웨이에서 생성한 거래 ID
-    
+
 	-- 결제 금액 정보
     amount                      NUMERIC(18,4)            NOT NULL,                                 	-- 결제 금액
     currency                    CHAR(3)                  NOT NULL DEFAULT 'KRW',                  	-- 통화 단위 (ISO 4217)
     exchange_rate               NUMERIC(18,6),                                                     	-- 환율 (외화 결제 시 적용)
-    
+
 	-- 결제 수단 정보
     payment_method              VARCHAR(50)              NOT NULL,                                 	-- 결제 수단 (CREDIT_CARD/BANK_TRANSFER/VIRTUAL_ACCOUNT 등)
     card_digits            		VARCHAR(4),                                                        	-- 카드 마지막 4자리 (보안상 부분 정보만)
-    
+
     -- 처리 시간 정보
     processed_at                TIMESTAMP WITH TIME ZONE,                                          	-- 결제 처리 완료 일시
     failed_at                   TIMESTAMP WITH TIME ZONE,                                          	-- 결제 실패 일시
     failure_reason              TEXT,                                                              	-- 결제 실패 사유
-    
+
 	-- 상태 관리
 	status                      VARCHAR(20)              NOT NULL DEFAULT 'PENDING',              	-- 거래 상태 (PENDING/SUCCESS/FAILED/CANCELED)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
     -- 제약조건
     CONSTRAINT fk_transactions__tenant_id 				FOREIGN KEY (tenant_id) 	REFERENCES tnnt.tenants(id)		ON DELETE CASCADE,
     CONSTRAINT fk_transactions__invoice_id 				FOREIGN KEY (invoice_id) 	REFERENCES bill.invoices(id)	ON DELETE CASCADE,
-	
+
 	CONSTRAINT uk_transactions__transaction_no 			UNIQUE (transaction_no),
-	
+
     CONSTRAINT ck_transactions__transaction_type 		CHECK (transaction_type IN ('PAYMENT', 'REFUND', 'CHARGEBACK')),
     CONSTRAINT ck_transactions__status 					CHECK (status IN ('PENDING', 'SUCCESS', 'FAILED', 'CANCELED')),
     CONSTRAINT ck_transactions__payment_method 			CHECK (payment_method IN ('CREDIT_CARD', 'BANK_TRANSFER', 'VIRTUAL_ACCOUNT', 'PAYPAL', 'KAKAOPAY', 'NAVERPAY')),

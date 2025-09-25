@@ -26,13 +26,13 @@ COPY pyproject.toml uv.lock* ./
 COPY src/ ./src/
 
 # Install dependencies
-RUN uv sync --frozen || uv pip install --system fastapi uvicorn sqlmodel psycopg2-binary redis pydantic python-multipart pydantic-settings python-jose passlib bcrypt
+RUN uv sync --frozen || uv pip install --system fastapi uvicorn SQLAlchemy psycopg2-binary redis pydantic python-multipart pydantic-settings python-jose passlib bcrypt
 
 # Expose port
 EXPOSE 8000
 
 # Command for development
-CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8100", "--reload"]
 
 # Production stage
 FROM base as production
@@ -42,14 +42,14 @@ COPY pyproject.toml uv.lock* ./
 COPY src/ ./src/
 
 # Install dependencies (production only)
-RUN uv sync --frozen --no-dev || uv pip install --system fastapi uvicorn sqlmodel psycopg2-binary redis pydantic python-multipart pydantic-settings python-jose passlib bcrypt
+RUN uv sync --frozen --no-dev || uv pip install --system fastapi uvicorn SQLAlchemy psycopg2-binary redis pydantic python-multipart pydantic-settings python-jose passlib bcrypt
 
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser && chown -R appuser /app
 USER appuser
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8100
 
 # Command for production
-CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8100"]

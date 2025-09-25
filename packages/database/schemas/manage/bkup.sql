@@ -3,7 +3,7 @@
 -- ============================================================================
 CREATE SCHEMA IF NOT EXISTS bkup;
 
-COMMENT ON SCHEMA bkup 
+COMMENT ON SCHEMA bkup
 IS 'BKUP: 백업/복구(BC/DR) 스키마: 스케줄/실행 기록과 DR 계획 관리.';
 
 -- ============================================================================
@@ -17,51 +17,51 @@ CREATE TABLE IF NOT EXISTS bkup.executions
     created_by                  UUID,                                                              	-- 백업 작업 생성자 UUID
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 백업 작업 수정 일시
     updated_by                  UUID,                                                              	-- 백업 작업 수정자 UUID
-    
+
     -- 백업 대상 정보
     backup_type                 VARCHAR(50)              NOT NULL,                                 	-- 백업 유형 (FULL_SYSTEM/TENANT_DATA/DATABASE/FILES/CONFIGURATION)
     backup_tenant_id            UUID,                                                              	-- 특정 테넌트 백업 대상 ID
     backup_database             VARCHAR(100),                                                      	-- 대상 데이터베이스명
     backup_schema               VARCHAR(100),                                                      	-- 대상 스키마명
-    
+
     -- 백업 기본 정보
     backup_name                 VARCHAR(200)             NOT NULL,                                 	-- 백업 작업명
     backup_method               VARCHAR(50)              NOT NULL DEFAULT 'AUTOMATED',            	-- 백업 방식 (AUTOMATED/MANUAL/SCHEDULED)
     backup_format               VARCHAR(20)              NOT NULL DEFAULT 'COMPRESSED',           	-- 백업 형식 (COMPRESSED/UNCOMPRESSED/ENCRYPTED)
-    
+
     -- 스케줄 관련 정보
     schedule_id                 UUID,                                                              	-- 백업 스케줄 참조 ID
     scheduled_at                TIMESTAMP WITH TIME ZONE,                                          	-- 예약 실행 시각
-    
+
     -- 실행 관련 정보
     started_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 백업 시작 일시
     completed_at                TIMESTAMP WITH TIME ZONE,                                          	-- 백업 완료 일시
     duration            		INTEGER,                                                           	-- 백업 소요 시간 (초)
-    
+
     -- 백업 결과 정보
     backup_size          	 	BIGINT,                                                            	-- 백업 파일 크기 (바이트)
     backup_file            		VARCHAR(500),                                                      	-- 백업 파일 저장 경로
     backup_checksum             VARCHAR(255),                                                      	-- 백업 파일 무결성 체크섬
-    
+
     -- 압축 관련 정보
     original_size         		BIGINT,                                                            	-- 원본 데이터 크기 (바이트)
     compression_rate           	NUMERIC(5,2),                                                      	-- 압축률 (백분율)
-    
+
     -- 상태 및 오류 정보
     status                      VARCHAR(20)              NOT NULL DEFAULT 'PENDING',              	-- 백업 작업 상태
     error_message               TEXT,                                                              	-- 실패 시 오류 메시지
     retry_count                 INTEGER                  NOT NULL DEFAULT 0,                      	-- 재시도 횟수
-    
+
     -- 보관 관리 정보
     retention_days              INTEGER                  NOT NULL DEFAULT 30,                     	-- 백업 보관 기간 (일)
     expires_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 백업 만료 일시
-    
+
     -- 논리적 삭제 플래그
     deleted                     BOOLEAN                  NOT NULL DEFAULT FALSE,                   	-- 논리적 삭제 플래그
-    
+
     -- 제약조건
     CONSTRAINT fk_executions__backup_tenant_id			FOREIGN KEY (backup_tenant_id) REFERENCES tnnt.tenants(id)	ON DELETE CASCADE,
-	
+
     CONSTRAINT ck_executions__backup_type 				CHECK (backup_type IN ('FULL_SYSTEM', 'TENANT_DATA', 'DATABASE', 'FILES', 'CONFIGURATION')),
     CONSTRAINT ck_executions__backup_method 			CHECK (backup_method IN ('AUTOMATED', 'MANUAL', 'SCHEDULED')),
     CONSTRAINT ck_executions__backup_format 			CHECK (backup_format IN ('COMPRESSED', 'UNCOMPRESSED', 'ENCRYPTED')),
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS bkup.executions
 );
 
 -- 컬럼별 코멘트 추가
-COMMENT ON TABLE bkup.executions 
+COMMENT ON TABLE bkup.executions
 IS '백업 작업 관리 - 시스템 및 테넌트 데이터 백업 작업 실행 이력 및 상태 관리';
 
 COMMENT ON COLUMN bkup.executions.id 					IS '백업 작업 고유 식별자 (UUID)';
@@ -168,7 +168,7 @@ CREATE INDEX IF NOT EXISTS ix_executions__currently_running
 -- ============================================================================
 -- 백업 스케줄 정의 테이블
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS bkup.schedules 
+CREATE TABLE IF NOT EXISTS bkup.schedules
 (
     -- 기본 식별자 및 감사 필드
     id                          UUID                     PRIMARY KEY DEFAULT gen_random_uuid(),		-- 백업 스케줄 고유 식별자
@@ -176,54 +176,54 @@ CREATE TABLE IF NOT EXISTS bkup.schedules
     created_by                  UUID,                                                              	-- 스케줄 생성자 UUID
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 스케줄 수정 일시
     updated_by                  UUID,                                                              	-- 스케줄 수정자 UUID
-    
+
     -- 스케줄 기본 정보
     schedule_name               VARCHAR(200)             NOT NULL,                                 	-- 스케줄 이름
     backup_type                 VARCHAR(50)              NOT NULL,                                 	-- 백업 유형 (FULL_SYSTEM/TENANT_DATA/DATABASE/FILES)
-    
+
     -- 백업 대상 설정
     target_scope                VARCHAR(50)              NOT NULL DEFAULT 'ALL_TENANTS',          	-- 백업 대상 범위
     target_tenants           	UUID[],                                                            	-- 특정 테넌트 대상 ID 배열
     target_databases            TEXT[],                                                            	-- 대상 데이터베이스 목록
-    
+
     -- 스케줄 실행 설정
     frequency                   VARCHAR(20)              NOT NULL,                                 	-- 실행 주기 (DAILY/WEEKLY/MONTHLY/QUARTERLY)
     schedule_time               TIME                     NOT NULL,                                 	-- 실행 시각
     schedule_days               INTEGER[],                                                         	-- 실행 요일 또는 날짜 배열
     timezone                    VARCHAR(50)              NOT NULL DEFAULT 'Asia/Seoul',           	-- 시간대 설정
-    
+
     -- 백업 옵션 설정
     backup_format               VARCHAR(20)              NOT NULL DEFAULT 'COMPRESSED',           	-- 백업 형식
     retention_days              INTEGER                  NOT NULL DEFAULT 30,                     	-- 백업 보관 기간 (일)
     max_parallel_jobs           INTEGER                  NOT NULL DEFAULT 1,                      	-- 동시 실행 가능한 백업 작업 수
-    
+
     -- 알림 설정
     notify_success           	BOOLEAN                  NOT NULL DEFAULT FALSE,                  	-- 성공 시 알림 여부
     notify_failure           	BOOLEAN                  NOT NULL DEFAULT TRUE,                   	-- 실패 시 알림 여부
     notify_emails         		TEXT[],                                                            	-- 알림 받을 이메일 목록
-    
+
     -- 실행 이력 정보
     next_run_at                 TIMESTAMP WITH TIME ZONE,                                          	-- 다음 실행 예정 시각
     last_run_at                 TIMESTAMP WITH TIME ZONE,                                          	-- 마지막 실행 시각
-    
+
     -- 스케줄 상태 관리
     enabled                  	BOOLEAN                  NOT NULL DEFAULT TRUE,                   	-- 스케줄 활성화 여부
-    
+
     -- 논리적 삭제 플래그
     deleted                     BOOLEAN                  NOT NULL DEFAULT FALSE,                   	-- 논리적 삭제 플래그
-    
+
     -- 제약조건
-    CONSTRAINT ck_schedules__backup_type				CHECK (backup_type IN ('FULL_SYSTEM', 'TENANT_DATA', 'DATABASE', 'FILES', 'CONFIGURATION')),		
-    CONSTRAINT ck_schedules__frequency					CHECK (frequency IN ('DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY')),		
-    CONSTRAINT ck_schedules__target_scope				CHECK (target_scope IN ('ALL_TENANTS', 'SPECIFIC_TENANTS', 'SYSTEM_ONLY')),		
-    CONSTRAINT ck_schedules__retention_days				CHECK (retention_days > 0),		
-    CONSTRAINT ck_schedules__max_parallel_jobs			CHECK (max_parallel_jobs > 0),		
-    CONSTRAINT ck_schedules__backup_format				CHECK (backup_format IN ('COMPRESSED', 'UNCOMPRESSED', 'ENCRYPTED'))		
+    CONSTRAINT ck_schedules__backup_type				CHECK (backup_type IN ('FULL_SYSTEM', 'TENANT_DATA', 'DATABASE', 'FILES', 'CONFIGURATION')),
+    CONSTRAINT ck_schedules__frequency					CHECK (frequency IN ('DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY')),
+    CONSTRAINT ck_schedules__target_scope				CHECK (target_scope IN ('ALL_TENANTS', 'SPECIFIC_TENANTS', 'SYSTEM_ONLY')),
+    CONSTRAINT ck_schedules__retention_days				CHECK (retention_days > 0),
+    CONSTRAINT ck_schedules__max_parallel_jobs			CHECK (max_parallel_jobs > 0),
+    CONSTRAINT ck_schedules__backup_format				CHECK (backup_format IN ('COMPRESSED', 'UNCOMPRESSED', 'ENCRYPTED'))
 --    CONSTRAINT ck_schedules__schedule_days_range 		CHECK (schedule_days IS NULL OR (
---															CASE 
---																WHEN frequency = 'WEEKLY' THEN 
+--															CASE
+--																WHEN frequency = 'WEEKLY' THEN
 --																	(SELECT bool_and(day >= 1 AND day <= 7) FROM unnest(schedule_days) AS day)
---																WHEN frequency = 'MONTHLY' THEN 
+--																WHEN frequency = 'MONTHLY' THEN
 --																	(SELECT bool_and(day >= 1 AND day <= 31) FROM unnest(schedule_days) AS day)
 --																ELSE TRUE
 --															END
@@ -346,7 +346,7 @@ CREATE INDEX IF NOT EXISTS ix_schedules__notify_emails_gin
 -- ============================================================================
 -- 재해복구 계획 테이블
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS bkup.recovery_plans 
+CREATE TABLE IF NOT EXISTS bkup.recovery_plans
 (
     -- 기본 식별자 및 감사 필드
     id                          UUID                     PRIMARY KEY DEFAULT gen_random_uuid(),		-- 복구 계획 고유 식별자
@@ -354,59 +354,59 @@ CREATE TABLE IF NOT EXISTS bkup.recovery_plans
     created_by                  UUID,                                                              	-- 계획 생성자 UUID
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 계획 수정 일시
     updated_by                  UUID,                                                              	-- 계획 수정자 UUID
-    
+
     -- 계획 기본 정보
     plan_name                   VARCHAR(200)             NOT NULL,                                 	-- 복구 계획명
     plan_type                   VARCHAR(50)              NOT NULL,                                 	-- 계획 유형 (FULL_RECOVERY/PARTIAL_RECOVERY/TENANT_RECOVERY)
 	description            		TEXT,                                                              	-- 계획 상세 설명
-    
-    
+
+
     -- 복구 대상 설정
     recovery_scope              VARCHAR(50)              NOT NULL,                                 	-- 복구 범위 (ALL_SYSTEMS/SPECIFIC_SERVICES/TENANT_DATA)
     target_services             TEXT[],                                                            	-- 복구 대상 서비스 목록
     target_tenants           	UUID[],                                                            	-- 복구 대상 테넌트 ID 목록
-    
+
     -- 복구 목표 설정
     recovery_time               INTEGER                  NOT NULL,                                 	-- 복구 목표 시간 (분단위)
     recovery_point              INTEGER                  NOT NULL,                                 	-- 복구 목표 시점 (분단위)
-    
+
     -- 복구 절차 정의
     recovery_steps              JSONB                    NOT NULL,                                 	-- 전체 복구 단계별 절차
     automated_steps             JSONB                    NOT NULL DEFAULT '[]',                   	-- 자동화된 복구 단계
     manual_steps                JSONB                    NOT NULL DEFAULT '[]',                   	-- 수동 복구 단계
-    
+
     -- 백업 요구사항
     required_backup_types       TEXT[],                                                            	-- 필요한 백업 유형 목록
     minimum_backup_age          INTEGER                  NOT NULL DEFAULT 24,                     	-- 최소 백업 보관 시간 (시간)
-    
+
     -- 테스트 관리 정보
     last_tested_at              TIMESTAMP WITH TIME ZONE,                                          	-- 마지막 테스트 실행 일시
     test_frequency_days         INTEGER                  NOT NULL DEFAULT 90,                     	-- 테스트 주기 (일)
     test_results                JSONB                    NOT NULL DEFAULT '{}',                   	-- 마지막 테스트 결과
-    
+
     -- 담당자 정보
     primary_contact             VARCHAR(100),                                                      	-- 1차 담당자 연락처
     secondary_contact           VARCHAR(100),                                                      	-- 2차 담당자 연락처
     escalation_contacts         TEXT[],                                                            	-- 에스컬레이션 담당자 목록
-    
+
     -- 승인 관리 정보
     approved_by                 VARCHAR(100),                                                      	-- 계획 승인자
     approved_at                 TIMESTAMP WITH TIME ZONE,                                          	-- 계획 승인 일시
-    
+
     -- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'DRAFT',                	-- 계획 상태
-    
+
     -- 논리적 삭제 플래그
     deleted                     BOOLEAN                  NOT NULL DEFAULT FALSE,                   	-- 논리적 삭제 플래그
-    
+
     -- 제약조건
-    CONSTRAINT ck_recovery_plans__plan_type        			CHECK (plan_type IN ('FULL_RECOVERY', 'PARTIAL_RECOVERY', 'TENANT_RECOVERY')),		
-    CONSTRAINT ck_recovery_plans__recovery_scope   			CHECK (recovery_scope IN ('ALL_SYSTEMS', 'SPECIFIC_SERVICES', 'TENANT_DATA')),		
-    CONSTRAINT ck_recovery_plans__status 	        		CHECK (status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'ARCHIVED')),		
-    CONSTRAINT ck_recovery_plans__recovery_time_positive    CHECK (recovery_time > 0),		
-    CONSTRAINT ck_recovery_plans__recovery_point_positive   CHECK (recovery_point >= 0),		
-    CONSTRAINT ck_recovery_plans__test_frequency_positive   CHECK (test_frequency_days > 0),		
-    CONSTRAINT ck_recovery_plans__backup_age_positive       CHECK (minimum_backup_age > 0),		
+    CONSTRAINT ck_recovery_plans__plan_type        			CHECK (plan_type IN ('FULL_RECOVERY', 'PARTIAL_RECOVERY', 'TENANT_RECOVERY')),
+    CONSTRAINT ck_recovery_plans__recovery_scope   			CHECK (recovery_scope IN ('ALL_SYSTEMS', 'SPECIFIC_SERVICES', 'TENANT_DATA')),
+    CONSTRAINT ck_recovery_plans__status 	        		CHECK (status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'ARCHIVED')),
+    CONSTRAINT ck_recovery_plans__recovery_time_positive    CHECK (recovery_time > 0),
+    CONSTRAINT ck_recovery_plans__recovery_point_positive   CHECK (recovery_point >= 0),
+    CONSTRAINT ck_recovery_plans__test_frequency_positive   CHECK (test_frequency_days > 0),
+    CONSTRAINT ck_recovery_plans__backup_age_positive       CHECK (minimum_backup_age > 0),
     CONSTRAINT ck_recovery_plans__rto_rpo_logic         	CHECK (recovery_time >= recovery_point)
 );
 

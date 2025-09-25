@@ -3,7 +3,7 @@
 -- ============================================================================
 CREATE SCHEMA IF NOT EXISTS noti;
 
-COMMENT ON SCHEMA noti 
+COMMENT ON SCHEMA noti
 IS 'NOTI: 알림/커뮤니케이션 스키마: 멀티채널 알림/캠페인 전송 메타.';
 
 -- ============================================================================
@@ -17,56 +17,56 @@ CREATE TABLE IF NOT EXISTS noti.notifications
     created_by                  UUID,                                                              	-- 알림 생성자 UUID
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 알림 수정 일시
     updated_by                  UUID,                                                              	-- 알림 수정자 UUID
-    
+
     -- 알림 대상 정보
     tenant_id                   UUID,                                                              	-- 특정 테넌트 대상 ID
     user_id                     UUID,                                                              	-- 특정 사용자 대상 ID
     target_type                 VARCHAR(20)              NOT NULL DEFAULT 'USER',                 	-- 대상 유형 (USER/TENANT/ADMIN/SYSTEM)
-    
+
     -- 알림 내용 정보
     notify_type                 VARCHAR(50)              NOT NULL,                                 	-- 알림 유형 (SYSTEM_ALERT/BILLING_NOTICE/FEATURE_UPDATE 등)
     title                       VARCHAR(200)             NOT NULL,                                 	-- 알림 제목
     message                     TEXT                     NOT NULL,                                 	-- 알림 메시지 내용
     priority                    VARCHAR(20)              NOT NULL DEFAULT 'MEDIUM',               	-- 알림 우선순위 (LOW/MEDIUM/HIGH/URGENT)
-    
+
     -- 전송 채널 설정
     channels                    TEXT[]                   NOT NULL DEFAULT ARRAY['IN_APP'],        	-- 전송 채널 목록
-    
+
     -- 전송 관리 정보
     scheduled_at                TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,                  	-- 예약 발송 시각
     sent_at                     TIMESTAMP WITH TIME ZONE,                                          	-- 실제 발송 시각
     delivery_attempts           INTEGER                  NOT NULL DEFAULT 0,                      	-- 전송 시도 횟수
-    
+
     -- 수신 확인 정보
     read_at                     TIMESTAMP WITH TIME ZONE,                                          	-- 알림 읽은 시각
     acknowledged_at             TIMESTAMP WITH TIME ZONE,                                          	-- 알림 확인 시각
-    
+
     -- 액션 관리 정보
     action_required             BOOLEAN                  NOT NULL DEFAULT FALSE,                  	-- 사용자 액션 필요 여부
     action_url                  VARCHAR(500),                                                      	-- 액션 수행을 위한 URL
     action_deadline             TIMESTAMP WITH TIME ZONE,                                          	-- 액션 수행 마감일
-    
+
     -- 만료 관리
     expires_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 알림 만료 일시
-    
+
     -- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'PENDING',              	-- 알림 상태
     delivery_status             JSONB                    NOT NULL DEFAULT '{}',                   	-- 채널별 전송 상태
-    
+
     -- 논리적 삭제 플래그
     deleted                     BOOLEAN                  NOT NULL DEFAULT FALSE,                   	-- 논리적 삭제 플래그
-    
+
     -- 제약조건
     CONSTRAINT fk_notifications__tenant_id 		        	FOREIGN KEY (tenant_id) REFERENCES tnnt.tenants(id)	ON DELETE CASCADE,
     CONSTRAINT fk_notifications__user_id 		        	FOREIGN KEY (user_id) 	REFERENCES tnnt.users(id)	ON DELETE CASCADE,
-	
-    CONSTRAINT ck_notifications__target_type 	        	CHECK (target_type IN ('USER', 'TENANT', 'ADMIN', 'SYSTEM')),		
-    CONSTRAINT ck_notifications__notify_type 	        	CHECK (notify_type IN ('SYSTEM_ALERT', 'BILLING_NOTICE', 'FEATURE_UPDATE', 'MAINTENANCE', 'SECURITY_ALERT', 'USER_NOTIFICATION', 'ADMIN_ALERT')),		
-    CONSTRAINT ck_notifications__priority 		       	 	CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')),		
-    CONSTRAINT ck_notifications__status 		        	CHECK (status IN ('PENDING', 'SENT', 'DELIVERED', 'FAILED', 'EXPIRED')),		
-    CONSTRAINT ck_notifications__delivery_attempts_positive	CHECK (delivery_attempts >= 0),		
-    CONSTRAINT ck_notifications__channels_not_empty 	    CHECK (array_length(channels, 1) > 0),		
-    CONSTRAINT ck_notifications__action_deadline_logic      CHECK (action_deadline IS NULL OR action_required = TRUE),		
+
+    CONSTRAINT ck_notifications__target_type 	        	CHECK (target_type IN ('USER', 'TENANT', 'ADMIN', 'SYSTEM')),
+    CONSTRAINT ck_notifications__notify_type 	        	CHECK (notify_type IN ('SYSTEM_ALERT', 'BILLING_NOTICE', 'FEATURE_UPDATE', 'MAINTENANCE', 'SECURITY_ALERT', 'USER_NOTIFICATION', 'ADMIN_ALERT')),
+    CONSTRAINT ck_notifications__priority 		       	 	CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')),
+    CONSTRAINT ck_notifications__status 		        	CHECK (status IN ('PENDING', 'SENT', 'DELIVERED', 'FAILED', 'EXPIRED')),
+    CONSTRAINT ck_notifications__delivery_attempts_positive	CHECK (delivery_attempts >= 0),
+    CONSTRAINT ck_notifications__channels_not_empty 	    CHECK (array_length(channels, 1) > 0),
+    CONSTRAINT ck_notifications__action_deadline_logic      CHECK (action_deadline IS NULL OR action_required = TRUE),
     CONSTRAINT ck_notifications__target_consistency         CHECK (
 																	(target_type = 'USER' AND user_id IS NOT NULL) OR
 																	(target_type = 'TENANT' AND tenant_id IS NOT NULL) OR
@@ -212,7 +212,7 @@ CREATE INDEX IF NOT EXISTS ix_notifications__delivery_status_gin
 -- ============================================================================
 -- 알림 템플릿 테이블
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS noti.templates 
+CREATE TABLE IF NOT EXISTS noti.templates
 (
     -- 기본 식별자 및 감사 필드
     id                          UUID                     PRIMARY KEY DEFAULT gen_random_uuid(),		-- 알림 템플릿 고유 식별자
@@ -220,16 +220,16 @@ CREATE TABLE IF NOT EXISTS noti.templates
     created_by                  UUID,                                                              	-- 템플릿 생성자 UUID
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 템플릿 수정 일시
     updated_by                  UUID,                                                              	-- 템플릿 수정자 UUID
-    
+
     -- 템플릿 기본 정보
     template_code               VARCHAR(100)             UNIQUE NOT NULL,                          	-- 템플릿 식별 코드
     template_name               VARCHAR(200)             NOT NULL,                                 	-- 템플릿 이름
     description                 TEXT,                                                              	-- 템플릿 설명
-    
+
     -- 템플릿 분류 정보
     category                    VARCHAR(50)              NOT NULL,                                 	-- 템플릿 카테고리 (SYSTEM/BILLING/SECURITY/MARKETING/SUPPORT)
     notify_type                 VARCHAR(50)              NOT NULL,                                 	-- 알림 유형
-    
+
     -- 채널별 템플릿 내용
     email_subject               VARCHAR(500),                                                      	-- 이메일 제목 템플릿
     email_body                  TEXT,                                                              	-- 이메일 본문 템플릿 (HTML)
@@ -238,41 +238,41 @@ CREATE TABLE IF NOT EXISTS noti.templates
     push_body                   VARCHAR(500),                                                      	-- 푸시 알림 본문 템플릿
     in_app_title                VARCHAR(200),                                                      	-- 앱 내 알림 제목 템플릿
     in_app_message              TEXT,                                                              	-- 앱 내 알림 메시지 템플릿
-    
+
     -- 템플릿 메타데이터
     template_variables          JSONB                    NOT NULL DEFAULT '{}',                   	-- 사용 가능한 변수 정의
-    
+
     -- 다국어 지원
     locale                      VARCHAR(10)              NOT NULL DEFAULT 'ko-KR',                	-- 언어 로케일
-    
+
     -- 버전 관리
     version                     VARCHAR(20)              NOT NULL DEFAULT '1.0',                  	-- 템플릿 버전
     previous_version_id         UUID,                                                              	-- 이전 버전 템플릿 ID
-    
+
     -- 테스트 지원
     test_data                   JSONB                    NOT NULL DEFAULT '{}',                   	-- 테스트용 샘플 데이터
-    
+
     -- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'ACTIVE',               	-- 템플릿 상태
-    
+
     -- 논리적 삭제 플래그
     deleted                     BOOLEAN                  NOT NULL DEFAULT FALSE,                   	-- 논리적 삭제 플래그
-    
+
     -- 제약조건
     CONSTRAINT fk_templates__previous_version_id        FOREIGN KEY (previous_version_id) REFERENCES noti.templates(id),
-	
+
     CONSTRAINT ck_templates__category 			        CHECK (category IN ('SYSTEM', 'BILLING', 'SECURITY', 'MARKETING', 'SUPPORT', 'MAINTENANCE', 'USER_ACCOUNT')),
     CONSTRAINT ck_templates__notify_type 		        CHECK (notify_type IN ('SYSTEM_ALERT', 'BILLING_NOTICE', 'FEATURE_UPDATE', 'MAINTENANCE', 'SECURITY_ALERT', 'USER_NOTIFICATION', 'ADMIN_ALERT')),
     CONSTRAINT ck_templates__status 			        CHECK (status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')),
     CONSTRAINT ck_templates__sms_length 		        CHECK (sms_message IS NULL OR length(sms_message) <= 1000),
     CONSTRAINT ck_templates__push_title_length 	        CHECK (push_title IS NULL OR length(push_title) <= 200),
     CONSTRAINT ck_templates__push_body_length 	        CHECK (push_body IS NULL OR length(push_body) <= 500),
-    CONSTRAINT ck_templates__has_content 		        CHECK (	email_subject 	IS NOT NULL OR 
-																email_body 		IS NOT NULL OR 
-																sms_message 	IS NOT NULL OR 
-																push_title 		IS NOT NULL OR 
-																push_body 		IS NOT NULL OR 
-																in_app_title 	IS NOT NULL OR 
+    CONSTRAINT ck_templates__has_content 		        CHECK (	email_subject 	IS NOT NULL OR
+																email_body 		IS NOT NULL OR
+																sms_message 	IS NOT NULL OR
+																push_title 		IS NOT NULL OR
+																push_body 		IS NOT NULL OR
+																in_app_title 	IS NOT NULL OR
 																in_app_message 	IS NOT NULL
 														)
 );
@@ -385,7 +385,7 @@ CREATE INDEX IF NOT EXISTS ix_templates__active_by_locale_type
 -- ============================================================================
 -- 이메일 캠페인 테이블
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS noti.campaigns 
+CREATE TABLE IF NOT EXISTS noti.campaigns
 (
     -- 기본 식별자 및 감사 필드
     id                          UUID                     PRIMARY KEY DEFAULT gen_random_uuid(),		-- 캠페인 고유 식별자
@@ -393,33 +393,33 @@ CREATE TABLE IF NOT EXISTS noti.campaigns
     created_by                  UUID,                                                              	-- 캠페인 생성자 UUID
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 캠페인 수정 일시
     updated_by                  UUID,                                                              	-- 캠페인 수정자 UUID
-    
+
     -- 캠페인 기본 정보
     campaign_name               VARCHAR(200)             NOT NULL,                                 	-- 캠페인 이름
     campaign_type               VARCHAR(50)              NOT NULL,                                 	-- 캠페인 유형 (PROMOTIONAL/TRANSACTIONAL/NEWSLETTER/ANNOUNCEMENT)
     description                 TEXT,                                                              	-- 캠페인 설명
-    
+
     -- 대상 설정
     target_type                 VARCHAR(20)              NOT NULL DEFAULT 'users',         			-- 대상 유형 (ALL_USERS/users/ADMIN_USERS/CUSTOM_LIST)
     target_tenant_types         TEXT[],                                                            	-- 대상 테넌트 유형 목록
     target_user_roles           TEXT[],                                                            	-- 대상 사용자 역할 목록
     custom_recipients           UUID[],                                                            	-- 사용자 정의 수신자 UUID 목록
-    
+
     -- 이메일 내용
     subject                     VARCHAR(500)             NOT NULL,                                 	-- 이메일 제목
     html_content                TEXT,                                                              	-- HTML 이메일 내용
     text_content                TEXT,                                                              	-- 텍스트 이메일 내용
-    
+
     -- 발송자 설정
     sender_name                 VARCHAR(100)             NOT NULL DEFAULT 'AI 업무지원 플랫폼',      	-- 발송자 이름
     sender_email                VARCHAR(255)             NOT NULL DEFAULT 'noreply@platform.com', 	-- 발송자 이메일
     reply_to_email              VARCHAR(255),                                                      	-- 답장 이메일 주소
-    
+
     -- 스케줄링 설정
     send_immediately            BOOLEAN                  NOT NULL DEFAULT FALSE,                  	-- 즉시 발송 여부
     scheduled_send_at           TIMESTAMP WITH TIME ZONE,                                          	-- 예약 발송 시각
     timezone                    VARCHAR(50)              NOT NULL DEFAULT 'Asia/Seoul',           	-- 시간대 설정
-    
+
     -- 발송 결과 통계
     total_recipients            INTEGER                  NOT NULL DEFAULT 0,                      	-- 총 수신자 수
     sent_count                  INTEGER                  NOT NULL DEFAULT 0,                      	-- 발송 성공 건수
@@ -428,31 +428,31 @@ CREATE TABLE IF NOT EXISTS noti.campaigns
     clicked_count               INTEGER                  NOT NULL DEFAULT 0,                      	-- 클릭 건수
     bounced_count               INTEGER                  NOT NULL DEFAULT 0,                      	-- 반송 건수
     unsubscribed_count          INTEGER                  NOT NULL DEFAULT 0,                      	-- 구독 취소 건수
-    
+
     -- A/B 테스트 설정
     is_ab_test                  BOOLEAN                  NOT NULL DEFAULT FALSE,                  	-- A/B 테스트 여부
     ab_test_rate                INTEGER,                                                           	-- A 그룹 비율 (백분율)
     ab_subject                  VARCHAR(500),                                                      	-- B 그룹 이메일 제목
     ab_content                  TEXT,                                                              	-- B 그룹 이메일 내용
-    
+
     -- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'DRAFT',                	-- 캠페인 상태
     sent_at                     TIMESTAMP WITH TIME ZONE,                                          	-- 발송 시작 시각
     completed_at                TIMESTAMP WITH TIME ZONE,                                          	-- 발송 완료 시각
-    
+
     -- 논리적 삭제 플래그
     deleted                     BOOLEAN                  NOT NULL DEFAULT FALSE,                   	-- 논리적 삭제 플래그
-    
+
     -- 제약조건
-    CONSTRAINT ck_campaigns__campaign_type 		        CHECK (campaign_type IN ('PROMOTIONAL', 'TRANSACTIONAL', 'NEWSLETTER', 'ANNOUNCEMENT', 'SURVEY', 'WELCOME')),		
-    CONSTRAINT ck_campaigns__target_type 		        CHECK (target_type IN ('ALL_USERS', 'users', 'ADMIN_USERS', 'CUSTOM_LIST')),		
-    CONSTRAINT ck_campaigns__status 			        CHECK (status IN ('DRAFT', 'SCHEDULED', 'SENDING', 'SENT', 'PAUSED', 'CANCELED')),		
-    CONSTRAINT ck_campaigns__ab_test_rate 		        CHECK (ab_test_rate IS NULL OR (ab_test_rate BETWEEN 1 AND 99)),		
-    CONSTRAINT ck_campaigns__statistics_positive        CHECK (total_recipients >= 0 AND sent_count >= 0 AND delivered_count >= 0 AND opened_count >= 0 AND clicked_count >= 0 AND bounced_count >= 0 AND unsubscribed_count >= 0),			   
-    CONSTRAINT ck_campaigns__statistics_logic 	        CHECK (sent_count <= total_recipients AND delivered_count <= sent_count AND opened_count <= delivered_count AND clicked_count <= opened_count),			   
-    CONSTRAINT ck_campaigns__content_required 	        CHECK (html_content IS NOT NULL OR text_content IS NOT NULL),		
-    CONSTRAINT ck_campaigns__ab_test_logic 		        CHECK ((is_ab_test = FALSE) OR (is_ab_test = TRUE AND ab_test_rate IS NOT NULL AND ab_subject IS NOT NULL)),		
-    CONSTRAINT ck_campaigns__sender_email_format        CHECK (sender_email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),		
+    CONSTRAINT ck_campaigns__campaign_type 		        CHECK (campaign_type IN ('PROMOTIONAL', 'TRANSACTIONAL', 'NEWSLETTER', 'ANNOUNCEMENT', 'SURVEY', 'WELCOME')),
+    CONSTRAINT ck_campaigns__target_type 		        CHECK (target_type IN ('ALL_USERS', 'users', 'ADMIN_USERS', 'CUSTOM_LIST')),
+    CONSTRAINT ck_campaigns__status 			        CHECK (status IN ('DRAFT', 'SCHEDULED', 'SENDING', 'SENT', 'PAUSED', 'CANCELED')),
+    CONSTRAINT ck_campaigns__ab_test_rate 		        CHECK (ab_test_rate IS NULL OR (ab_test_rate BETWEEN 1 AND 99)),
+    CONSTRAINT ck_campaigns__statistics_positive        CHECK (total_recipients >= 0 AND sent_count >= 0 AND delivered_count >= 0 AND opened_count >= 0 AND clicked_count >= 0 AND bounced_count >= 0 AND unsubscribed_count >= 0),
+    CONSTRAINT ck_campaigns__statistics_logic 	        CHECK (sent_count <= total_recipients AND delivered_count <= sent_count AND opened_count <= delivered_count AND clicked_count <= opened_count),
+    CONSTRAINT ck_campaigns__content_required 	        CHECK (html_content IS NOT NULL OR text_content IS NOT NULL),
+    CONSTRAINT ck_campaigns__ab_test_logic 		        CHECK ((is_ab_test = FALSE) OR (is_ab_test = TRUE AND ab_test_rate IS NOT NULL AND ab_subject IS NOT NULL)),
+    CONSTRAINT ck_campaigns__sender_email_format        CHECK (sender_email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
     CONSTRAINT ck_campaigns__reply_to_email_format      CHECK (reply_to_email IS NULL OR reply_to_email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
 );
 

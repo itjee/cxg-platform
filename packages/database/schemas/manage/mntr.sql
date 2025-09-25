@@ -3,7 +3,7 @@
 -- ============================================================================
 CREATE SCHEMA IF NOT EXISTS mntr;
 
-COMMENT ON SCHEMA mntr 
+COMMENT ON SCHEMA mntr
 IS 'MNTR: 시스템 모니터링 스키마: 서비스 가용성/성능 지표와 장애 이력을 관리.';
 
 -- ============================================================================
@@ -17,27 +17,27 @@ CREATE TABLE IF NOT EXISTS mntr.health_checks
     created_by                  UUID,                                                              	-- 헬스체크 실행 시스템 UUID
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 헬스체크 수정 일시
     updated_by                  UUID,                                                              	-- 헬스체크 수정자 UUID
-    
+
 	-- 모니터링 대상 정보
     service_name                VARCHAR(100)             NOT NULL,                                 	-- 모니터링 대상 서비스명 (API/DATABASE/REDIS/STORAGE 등)
     api_endpoint                VARCHAR(500),                                                      	-- 체크 대상 엔드포인트 URL
     check_type                  VARCHAR(50)              NOT NULL,                                 	-- 체크 유형 (HTTP/TCP/DATABASE/REDIS/CUSTOM)
-    
+
 	-- 체크 결과 정보
     response_time               INTEGER,                                                           	-- 응답 시간 (밀리초)
     error_message               TEXT,                                                              	-- 오류 메시지 (실패 시)
-    
+
 	-- 체크 설정 정보
     timeout_duration            INTEGER                  DEFAULT 5000,                            	-- 타임아웃 시간 (밀리초)
     expected_status_code        INTEGER,                                                           	-- HTTP 체크 시 예상 상태 코드 (200, 204 등)
-    
+
 	-- 확장 메타데이터
     check_data                  JSONB                    DEFAULT '{}',                            	-- 추가 체크 데이터 (헤더, 파라미터 등)
-    
+
 	-- 상태 관리
     status                      VARCHAR(20)              NOT NULL,                                 	-- 헬스 상태 (HEALTHY/DEGRADED/UNHEALTHY)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT ck_health_checks__status 					CHECK (status IN ('HEALTHY', 'DEGRADED', 'UNHEALTHY')),
     CONSTRAINT ck_health_checks__check_type 				CHECK (check_type IN ('HTTP', 'TCP', 'DATABASE', 'REDIS', 'ELASTICSEARCH', 'CUSTOM')),
@@ -141,41 +141,41 @@ CREATE TABLE IF NOT EXISTS mntr.incidents
     created_by                  UUID,                                                              	-- 인시던트 등록자 UUID (시스템 또는 관리자)
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 인시던트 수정 일시
     updated_by                  UUID,                                                              	-- 인시던트 수정자 UUID
-    
+
 	-- 인시던트 기본 정보
     incident_no                 VARCHAR(50)              NOT NULL,                          		-- 인시던트 번호 (INC-2024-001 형식)
     title                       VARCHAR(200)             NOT NULL,                                 	-- 인시던트 제목
     description                 TEXT,                                                              	-- 인시던트 상세 설명
     severity                    VARCHAR(20)              NOT NULL DEFAULT 'MEDIUM',               	-- 심각도 (CRITICAL/HIGH/MEDIUM/LOW)
-    
+
 	-- 영향 범위 정보
     affected_services           TEXT[],                                                            	-- 영향받은 서비스 목록 (배열)
     affected_tenants            UUID[],                                                            	-- 영향받은 테넌트 ID 목록 (배열)
     impact_scope                VARCHAR(20)              NOT NULL DEFAULT 'PARTIAL',              	-- 영향 범위 (GLOBAL/PARTIAL/SINGLE_TENANT)
-    
+
 	-- 인시던트 시간 정보
     incident_start_time         TIMESTAMP WITH TIME ZONE NOT NULL,                                 	-- 인시던트 시작 시간 (장애 발생 시점)
     incident_end_time           TIMESTAMP WITH TIME ZONE,                                          	-- 인시던트 종료 시간 (서비스 복구 시점)
     detection_time              TIMESTAMP WITH TIME ZONE,                                          	-- 장애 감지 시간 (모니터링 시스템 감지 시점)
     resolution_time             TIMESTAMP WITH TIME ZONE,                                          	-- 해결 완료 시간 (근본 해결 시점)
-    
+
 	-- 담당자 및 에스컬레이션 정보
     assigned_to                 VARCHAR(100),                                                      	-- 담당 엔지니어 또는 팀명
     escalation_level            INTEGER                  DEFAULT 1,                               	-- 에스컬레이션 단계 (1차, 2차, 3차 등)
     resolution_summary          TEXT,                                                              	-- 해결 요약 (임시 조치 및 최종 해결 방법)
-    
+
 	-- 사후 분석 정보
     root_cause                  TEXT,                                                              	-- 근본 원인 분석 (RCA)
     preventive_actions          TEXT,                                                              	-- 재발 방지 조치 계획
     lessons_learned             TEXT,                                                              	-- 교훈 및 개선 사항
-    
+
 	-- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'OPEN',                 	-- 인시던트 상태 (OPEN/IN_PROGRESS/RESOLVED/CLOSED)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
 	CONSTRAINT uk_incidents__incident_no		UNIQUE (incident_no),
-	
+
     CONSTRAINT ck_incidents__severity 			CHECK (severity IN ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW')),
     CONSTRAINT ck_incidents__impact_scope 		CHECK (impact_scope IN ('GLOBAL', 'PARTIAL', 'SINGLE_TENANT')),
     CONSTRAINT ck_incidents__status 			CHECK (status IN ('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED')),
@@ -235,13 +235,13 @@ CREATE INDEX IF NOT EXISTS ix_incidents__incident_start_time
 -- 진행중인 인시던트 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_incidents__open_incidents
     ON mntr.incidents (status, severity, created_at DESC)
- WHERE status IN ('OPEN', 'IN_PROGRESS') 
+ WHERE status IN ('OPEN', 'IN_PROGRESS')
    AND deleted = FALSE;
 
 -- 크리티컬 인시던트 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_incidents__critical_incidents
     ON mntr.incidents (severity, incident_start_time DESC)
- WHERE severity = 'CRITICAL' 
+ WHERE severity = 'CRITICAL'
    AND deleted = FALSE;
 
 -- 영향 범위별 조회 최적화
@@ -252,7 +252,7 @@ CREATE INDEX IF NOT EXISTS ix_incidents__impact_scope
 -- 담당자별 인시던트 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_incidents__assigned_to
     ON mntr.incidents (assigned_to, status, created_at DESC)
- WHERE assigned_to IS NOT NULL 
+ WHERE assigned_to IS NOT NULL
    AND deleted = FALSE;
 
 -- 에스컬레이션 단계별 조회 최적화
@@ -263,7 +263,7 @@ CREATE INDEX IF NOT EXISTS ix_incidents__escalation_level
 -- 해결된 인시던트 분석 최적화
 CREATE INDEX IF NOT EXISTS ix_incidents__resolution_analysis
     ON mntr.incidents (status, resolution_time DESC NULLS LAST)
- WHERE status IN ('RESOLVED', 'CLOSED') 
+ WHERE status IN ('RESOLVED', 'CLOSED')
    AND deleted = FALSE;
 
 -- 영향받은 서비스 검색을 위한 GIN 인덱스
@@ -297,34 +297,34 @@ CREATE TABLE IF NOT EXISTS mntr.system_metrics
     created_by                  UUID,                                 								-- 메트릭 수집 시스템 UUID
     updated_at                  TIMESTAMP WITH TIME ZONE,                   						-- 메트릭 수정 일시
     updated_by                  UUID,                                 								-- 메트릭 수정자 UUID
-    
+
 	-- 메트릭 분류 및 정보
     metric_category             VARCHAR(50)              NOT NULL,                                 	-- 메트릭 분류 (PERFORMANCE/RESOURCE/BUSINESS/SECURITY)
     metric_name                 VARCHAR(100)             NOT NULL,                                 	-- 메트릭 이름 (CPU_USAGE/RESPONSE_TIME/ACTIVE_USERS 등)
     metric_value                NUMERIC(18,4)            NOT NULL,                                 	-- 측정된 메트릭 값
     metric_unit                 VARCHAR(20)              NOT NULL,                                 	-- 메트릭 단위 (PERCENT/MILLISECONDS/COUNT/BYTES)
-    
+
 	-- 측정 대상 정보
     service_name                VARCHAR(100),                                                      	-- 측정 대상 서비스명
     instance_id                 VARCHAR(100),                                                      	-- 인스턴스 식별자
     tenant_id                   UUID,                                                              	-- 테넌트별 메트릭인 경우 테넌트 ID
-    
+
 	-- 시간 정보
     measure_time            	TIMESTAMP WITH TIME ZONE NOT NULL,                                 	-- 실제 측정 시점
     summary_period          	VARCHAR(20)              DEFAULT 'MINUTE',                        	-- 집계 주기 (MINUTE/HOUR/DAY)
-    
+
 	-- 임계값 및 알림 정보
     warning_threshold           NUMERIC(18,4),                                                     	-- 경고 임계값
     critical_threshold          NUMERIC(18,4),                                                     	-- 위험 임계값
     alert_triggered             BOOLEAN                  DEFAULT FALSE,                           	-- 알림 발생 여부
-    
+
 	-- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'ACTIVE',              	-- 메트릭 상태 (ACTIVE/INACTIVE/ARCHIVED)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT fk_system_metrics__tenant_id 			FOREIGN KEY (tenant_id) REFERENCES tnnt.tenants(id)	ON DELETE CASCADE,
-	
+
     CONSTRAINT ck_system_metrics__metric_category 		CHECK (metric_category IN ('PERFORMANCE', 'RESOURCE', 'BUSINESS', 'SECURITY')),
     CONSTRAINT ck_system_metrics__summary_period 		CHECK (summary_period IN ('MINUTE', 'HOUR', 'DAY')),
     CONSTRAINT ck_system_metrics__metric_unit 			CHECK (metric_unit IN ('PERCENT', 'MILLISECONDS', 'COUNT', 'BYTES', 'MBPS', 'REQUESTS_PER_SECOND')),
@@ -375,19 +375,19 @@ CREATE INDEX IF NOT EXISTS ix_system_metrics__metric_name
 -- 서비스별 메트릭 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_system_metrics__service_name
     ON mntr.system_metrics (service_name, measure_time DESC)
- WHERE service_name IS NOT NULL 
+ WHERE service_name IS NOT NULL
    AND deleted = FALSE;
 
 -- 테넌트별 메트릭 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_system_metrics__tenant_id
     ON mntr.system_metrics (tenant_id, measure_time DESC)
- WHERE tenant_id IS NOT NULL 
+ WHERE tenant_id IS NOT NULL
    AND deleted = FALSE;
 
 -- 인스턴스별 메트릭 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_system_metrics__instance_id
     ON mntr.system_metrics (instance_id, measure_time DESC)
- WHERE instance_id IS NOT NULL 
+ WHERE instance_id IS NOT NULL
    AND deleted = FALSE;
 
 -- 집계 주기별 조회 최적화
@@ -408,13 +408,13 @@ CREATE INDEX IF NOT EXISTS ix_system_metrics__high_values
 -- 서비스별 특정 메트릭 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_system_metrics__service_metric
     ON mntr.system_metrics (service_name, metric_name, measure_time DESC)
- WHERE service_name IS NOT NULL 
+ WHERE service_name IS NOT NULL
    AND deleted = FALSE;
 
 -- 테넌트별 분류 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_system_metrics__tenant_category
     ON mntr.system_metrics (tenant_id, metric_category, measure_time DESC)
- WHERE tenant_id IS NOT NULL 
+ WHERE tenant_id IS NOT NULL
    AND deleted = FALSE;
 
 -- 수집 시간 기준 조회 최적화
@@ -424,11 +424,11 @@ CREATE INDEX IF NOT EXISTS ix_system_metrics__created_at
 -- 일별 집계 데이터 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_system_metrics__daily_aggregation
     ON mntr.system_metrics (summary_period, measure_time DESC)
- WHERE summary_period = 'DAY' 
+ WHERE summary_period = 'DAY'
    AND deleted = FALSE;
 
 -- 성능 메트릭 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_system_metrics__performance_category
     ON mntr.system_metrics (metric_category, metric_name, measure_time DESC)
- WHERE metric_category = 'PERFORMANCE' 
+ WHERE metric_category = 'PERFORMANCE'
    AND deleted = FALSE;

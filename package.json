@@ -9,13 +9,15 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
+    "format": "turbo run format",
     "type-check": "turbo run type-check",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.2.4",
+    "@types/node": "^20.11.5",
     "turbo": "^1.12.5",
-    "typescript": "^5.3.3",
-    "@types/node": "^20.11.5"
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=20.0.0",

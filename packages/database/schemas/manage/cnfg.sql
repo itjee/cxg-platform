@@ -1,9 +1,9 @@
--- ============================================================================	
+-- ============================================================================
 -- 9. 시스템 설정 (Configuration Management) -> cnfg
 -- ============================================================================
 CREATE SCHEMA IF NOT EXISTS cnfg;
 
-COMMENT ON SCHEMA cnfg 
+COMMENT ON SCHEMA cnfg
 IS 'CNFG: 시스템 설정/플래그 스키마: 런타임 설정과 기능 토글(테넌트 오버라이드 포함).';
 
 -- ============================================================================
@@ -17,38 +17,38 @@ CREATE TABLE IF NOT EXISTS cnfg.configurations
     created_by                  UUID,                                                              	-- 구성 설정 생성자 UUID (관리자 또는 시스템)
     updated_at                  TIMESTAMP WITH TIME ZONE,                                          	-- 구성 설정 수정 일시
     updated_by                  UUID,                                                              	-- 구성 설정 수정자 UUID
-    
+
 	-- 설정 기본 정보
     config_category             VARCHAR(50)              NOT NULL,                                 	-- 설정 카테고리 (SYSTEM/SECURITY/BILLING/NOTIFICATION/INTEGRATION)
     config_code                 VARCHAR(200)             NOT NULL,                                 	-- 설정 코드 (고유 식별자)
     config_value                TEXT,                                                              	-- 현재 설정 값
     config_type                 VARCHAR(20)              NOT NULL DEFAULT 'STRING',               	-- 설정값 데이터 타입 (STRING/INTEGER/BOOLEAN/JSON/ENCRYPTED)
-    
+
 	-- 설정 설명 및 기본값
     description                 TEXT,                                                              	-- 설정 설명 (용도, 영향, 주의사항)
     default_value               TEXT,                                                              	-- 기본값
-    
+
 	-- 설정 제약 조건
     required                 	BOOLEAN                  DEFAULT FALSE,                           	-- 필수 설정 여부
     validation_rules            JSONB                    DEFAULT '{}',                            	-- 유효성 검사 규칙 (JSON 형태)
-    
+
 	-- 환경별 구성
     environment                 VARCHAR(20)              NOT NULL DEFAULT 'PRODUCTION',           	-- 적용 환경 (DEVELOPMENT/STAGING/PRODUCTION)
     applies_to_all 				BOOLEAN                  DEFAULT TRUE,                            	-- 모든 환경 적용 여부
-    
+
 	-- 변경 이력 추적
     previous_value              TEXT,                                                              	-- 이전 설정 값 (변경 추적용)
-    changed_by                  VARCHAR(100),                                                      	-- 변경자 (관리자 또는 시스템)    
+    changed_by                  VARCHAR(100),                                                      	-- 변경자 (관리자 또는 시스템)
 	change_reason               TEXT,                                                              	-- 변경 사유
-    
+
 	-- 설정 적용 상태
     start_time             	 	TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,                 -- 설정 적용 시작 시간
     close_time                	TIMESTAMP WITH TIME ZONE,                                          	-- 설정 적용 종료 시간 (NULL: 무기한)
-    
+
 	-- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'ACTIVE',              	-- 구성 상태 (ACTIVE/INACTIVE/DEPRECATED)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT uk_configurations__category_key_env 		UNIQUE (config_category, config_code, environment),
     CONSTRAINT ck_configurations__config_category 		CHECK (config_category IN ('SYSTEM', 'SECURITY', 'BILLING', 'NOTIFICATION', 'INTEGRATION', 'PERFORMANCE', 'MONITORING')),
@@ -89,57 +89,57 @@ COMMENT ON COLUMN cnfg.configurations.deleted 			IS '논리적 삭제 플래그 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_configurations
 	ON cnfg.configurations (config_category, config_code, environment)
  WHERE deleted = FALSE;
- 
+
 -- 카테고리별 설정 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_configurations__config_category
 	ON cnfg.configurations (config_category, created_at DESC)
  WHERE deleted = FALSE;
- 
+
 -- 설정 키별 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_configurations__config_code
 	ON cnfg.configurations (config_code, environment)
  WHERE deleted = FALSE;
- 
+
 -- 환경별 설정 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_configurations__environment
 	ON cnfg.configurations (environment, config_category)
  WHERE deleted = FALSE;
- 
+
 -- 활성 설정 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_configurations__active
 	ON cnfg.configurations (status, config_category, config_code)
  WHERE deleted = FALSE AND status = 'ACTIVE';
- 
+
 -- 유효 기간 기준 설정 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_configurations__effective_period
 	ON cnfg.configurations (start_time, close_time, status)
  WHERE deleted = FALSE;
- 
+
 -- 변경자별 설정 이력 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_configurations__changed_by
 	ON cnfg.configurations (changed_by, updated_at DESC)
  WHERE changed_by IS NOT NULL AND deleted = FALSE;
- 
+
 -- 설정 타입별 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_configurations__config_type
 	ON cnfg.configurations (config_type, config_category)
  WHERE deleted = FALSE;
- 
+
 -- 필수 설정 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_configurations__required_settings
 	ON cnfg.configurations (required, config_category, environment)
  WHERE required = TRUE AND deleted = FALSE;
- 
+
 -- 전역 설정 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_configurations__all_environments
 	ON cnfg.configurations (applies_to_all, config_code)
  WHERE applies_to_all = TRUE AND deleted = FALSE;
- 
+
 -- 유효성 규칙 검색을 위한 GIN 인덱스
 CREATE INDEX IF NOT EXISTS ix_configurations__validation_rules
 	ON cnfg.configurations USING GIN (validation_rules)
  WHERE deleted = FALSE;
- 
+
 -- 최근 변경 설정 조회 최적화
 --CREATE INDEX IF NOT EXISTS ix_configurations__recent_changes
 --	ON cnfg.configurations (updated_at DESC, changed_by)
@@ -149,11 +149,11 @@ CREATE INDEX IF NOT EXISTS ix_configurations__validation_rules
 CREATE INDEX IF NOT EXISTS ix_configurations__status
 	ON cnfg.configurations (status, config_category, created_at DESC)
  WHERE deleted = FALSE;
- 
+
 -- 생성 시간 기준 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_configurations__created_at
 	ON cnfg.configurations (created_at DESC);
-	
+
 -- ============================================================================
 -- 기능 플래그 관리 테이블
 -- ============================================================================
@@ -163,47 +163,47 @@ CREATE TABLE IF NOT EXISTS cnfg.feature_flags
     id                          UUID                     PRIMARY KEY DEFAULT gen_random_uuid(),		-- 기능 플래그 고유 식별자
     created_at                  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,        -- 기능 플래그 생성 일시
     created_by                  UUID,                                                               -- 기능 플래그 생성자 UUID
-    updated_at                  TIMESTAMP WITH TIME ZONE,                                           -- 기능 플래그 수정 일시  
+    updated_at                  TIMESTAMP WITH TIME ZONE,                                           -- 기능 플래그 수정 일시
     updated_by                  UUID,                                                               -- 기능 플래그 수정자 UUID
-    
+
     -- 기능 기본 정보
     flag_code                   VARCHAR(100)             NOT NULL,                           		-- 기능 플래그 코드 (애플리케이션에서 사용)
     flag_name                   VARCHAR(200)             NOT NULL,                                  -- 기능 플래그 표시명
     description                 TEXT,                                                               -- 기능 상세 설명
-    
+
     -- 플래그 활성화 설정
     enabled                 	BOOLEAN                  NOT NULL DEFAULT FALSE,                    -- 기능 전체 활성화 여부
     rollout_rate                INTEGER                  DEFAULT 0,                                 -- 점진적 배포 비율 (0-100%)
-    
+
     -- 대상 환경 및 사용자 설정
     target_environment          VARCHAR(20)              DEFAULT 'PRODUCTION',                      -- 대상 환경 (DEVELOPMENT/STAGING/PRODUCTION/ALL)
     target_user_groups          TEXT[],                                                             -- 대상 사용자 그룹 배열
     target_tenant_types         TEXT[],                                                             -- 대상 테넌트 유형 배열
     excluded_tenants            UUID[],                                                             -- 제외할 테넌트 ID 목록
-    
+
     -- 조건부 활성화 규칙
     activation_conditions       JSONB                    DEFAULT '{}',                              -- 기능 활성화 조건 (JSON 형태)
     deactivation_conditions     JSONB                    DEFAULT '{}',                              -- 기능 비활성화 조건 (JSON 형태)
-    
+
     -- 스케줄링 정보
     scheduled_enable_at         TIMESTAMP WITH TIME ZONE,                                           -- 예약 활성화 시각
     scheduled_disable_at        TIMESTAMP WITH TIME ZONE,                                           -- 예약 비활성화 시각
-    
+
     -- 사용량 및 성능 메트릭
     usage_count                 INTEGER                  DEFAULT 0,                                 -- 기능 호출 횟수
     error_count                 INTEGER                  DEFAULT 0,                                 -- 기능 사용 중 오류 발생 횟수
     last_used_at                TIMESTAMP WITH TIME ZONE,                                           -- 마지막 기능 사용 시각
-    
+
     -- 관리 및 소유권 정보
     owner_team                  VARCHAR(100),                                                       -- 기능 소유 팀
     contact_email               VARCHAR(255),                                                       -- 담당자 연락처 이메일
-    
+
     -- 논리적 삭제 플래그
     deleted                     BOOLEAN                  NOT NULL DEFAULT FALSE,                    -- 논리적 삭제 플래그
-    
+
     -- 제약조건
 	CONSTRAINT uk_feature_flags__flag_code 				UNIQUE (flag_code),
-	
+
     CONSTRAINT ck_feature_flags__rollout_rate           CHECK (rollout_rate >= 0 AND rollout_rate <= 100),
     CONSTRAINT ck_feature_flags__target_environment     CHECK (target_environment IN ('DEVELOPMENT', 'STAGING', 'PRODUCTION', 'ALL')),
     CONSTRAINT ck_feature_flags__usage_count            CHECK (usage_count >= 0),
@@ -299,31 +299,31 @@ CREATE TABLE IF NOT EXISTS cnfg.tenant_features
     created_by          	UUID,                                                               -- 레코드 생성자 UUID
     updated_at          	TIMESTAMP WITH TIME ZONE,                                           -- 레코드 최종 수정 일시
     updated_by          	UUID,                                                               -- 레코드 최종 수정자 UUID
-    
+
     -- 관계 참조 필드
     tenant_id           	UUID                     NOT NULL,                                  -- 대상 테넌트 ID
     feature_flag_id     	UUID                     NOT NULL,                                  -- 대상 기능 플래그 ID
-    
+
     -- 오버라이드 설정
     enabled    				BOOLEAN                  NOT NULL,                                  -- 테넌트별 기능 활성화 여부
     reason     				VARCHAR(500),                                                       -- 오버라이드 사유 설명
-    
+
     -- 유효 기간 설정
     start_time          	TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,        -- 오버라이드 유효 시작 일시
     close_time          	TIMESTAMP WITH TIME ZONE,                                           -- 오버라이드 유효 종료 일시
-    
+
     -- 승인 관리
     approved_by         	UUID,                                                               -- 승인자 UUID
     approved_at         	TIMESTAMP WITH TIME ZONE,                                           -- 승인 일시
     approval_reason     	TEXT,                                                               -- 승인 사유 메모
-    
+
     -- 논리적 삭제 플래그
     deleted             	BOOLEAN                  NOT NULL DEFAULT FALSE,                    -- 논리적 삭제 플래그
-    
+
     -- 제약조건
     CONSTRAINT fk_tenant_features__tenant_id		FOREIGN KEY (tenant_id) 		REFERENCES tnnt.tenants(id)			ON DELETE CASCADE,
     CONSTRAINT fk_tenant_features__feature_flag_id	FOREIGN KEY (feature_flag_id) 	REFERENCES cnfg.feature_flags(id)	ON DELETE CASCADE,
-	
+
     CONSTRAINT uk_tenant_features__tenant_feature	UNIQUE (tenant_id, feature_flag_id),
     CONSTRAINT ck_tenant_features__validity_period	CHECK (close_time IS NULL OR close_time > start_time)
 );
@@ -360,7 +360,7 @@ CREATE INDEX IF NOT EXISTS ix_tenant_features__feature_lookup
 -- 유효 기간 관리용 인덱스 (만료된 오버라이드 정리 작업용)
 CREATE INDEX IF NOT EXISTS ix_tenant_features__validity_management
 	ON cnfg.tenant_features (close_time, start_time)
- WHERE deleted = FALSE 
+ WHERE deleted = FALSE
    AND close_time IS NOT NULL;  -- 종료 시간이 설정된 활성 오버라이드만 대상
 
 -- 승인 관리용 인덱스 (승인 대기 중인 오버라이드 조회)
@@ -371,7 +371,7 @@ CREATE INDEX IF NOT EXISTS ix_tenant_features__approval_pending
 -- 승인자별 관리용 인덱스 (승인자가 처리한 오버라이드 이력 조회)
 CREATE INDEX IF NOT EXISTS ix_tenant_features__approver_history
 	ON cnfg.tenant_features (approved_by, approved_at DESC)
- WHERE deleted = FALSE 
+ WHERE deleted = FALSE
    AND approved_by IS NOT NULL;  -- 승인 완료된 레코드만 대상
 
 -- 생성일자 기준 조회용 인덱스 (최근 생성된 오버라이드들)
@@ -382,11 +382,11 @@ CREATE INDEX IF NOT EXISTS ix_tenant_features__created_at
 -- 현재 유효한 오버라이드 조회용 복합 인덱스
 --CREATE INDEX IF NOT EXISTS ix_tenant_features__currently_active
 --	ON cnfg.tenant_features (tenant_id, feature_flag_id, enabled)
--- WHERE deleted = FALSE 
---   AND start_time <= NOW() 
+-- WHERE deleted = FALSE
+--   AND start_time <= NOW()
 --   AND (close_time IS NULL OR close_time > NOW());  -- 현재 시점에서 유효한 오버라이드만 대상
-	
-	
+
+
 -- ============================================================================
 -- 서비스 할당량 관리
 -- ============================================================================
@@ -420,10 +420,10 @@ CREATE TABLE IF NOT EXISTS cnfg.service_quotas
     -- 상태 관리
     status                      VARCHAR(20)              NOT NULL DEFAULT 'ACTIVE',              	-- 할당량 상태 (ACTIVE/SUSPENDED/EXPIRED)
     deleted                  	BOOLEAN                  NOT NULL DEFAULT FALSE,                 	-- 논리적 삭제 플래그
-    
+
 	-- 제약조건
     CONSTRAINT fk_service_quotas__tenant_id 				FOREIGN KEY (tenant_id) REFERENCES tnnt.tenants(id)	ON DELETE CASCADE,
-	
+
     CONSTRAINT ck_service_quotas__quota_type 				CHECK (quota_type IN ('USERS', 'STORAGE', 'API_CALLS', 'AI_REQUESTS', 'WORKFLOWS', 'DOCUMENTS', 'BANDWIDTH')),
     CONSTRAINT ck_service_quotas__quota_period 				CHECK (quota_period IN ('DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY')),
     CONSTRAINT ck_service_quotas__status 					CHECK (status IN ('ACTIVE', 'SUSPENDED', 'EXPIRED')),
@@ -466,7 +466,7 @@ COMMENT ON COLUMN cnfg.service_quotas.deleted 					IS '논리적 삭제 플래�
 CREATE INDEX IF NOT EXISTS ix_service_quotas__tenant_id
 	ON cnfg.service_quotas (tenant_id)
  WHERE deleted = FALSE;
- 
+
 -- 할당량 유형별 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_service_quotas__quota_type
 	ON cnfg.service_quotas (quota_type, created_at DESC)
@@ -476,12 +476,12 @@ CREATE INDEX IF NOT EXISTS ix_service_quotas__quota_type
 CREATE INDEX IF NOT EXISTS ix_service_quotas__status
 	ON cnfg.service_quotas (status, created_at DESC)
  WHERE deleted = FALSE;
- 
+
 -- 테넌트별 할당량 유형 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_service_quotas__tenant_type
 	ON cnfg.service_quotas (tenant_id, quota_type)
  WHERE deleted = FALSE;
- 
+
 -- 사용량 기준 할당량 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_service_quotas__quota_usage
 	ON cnfg.service_quotas (quota_used, quota_limit, created_at DESC)
@@ -489,46 +489,46 @@ CREATE INDEX IF NOT EXISTS ix_service_quotas__quota_usage
 
 -- 기간별 할당량 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_service_quotas__period_dates
-	ON cnfg.service_quotas (start_date, close_date) 
+	ON cnfg.service_quotas (start_date, close_date)
  WHERE deleted = FALSE;
- 
+
 -- 경고 알림 대상 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_service_quotas__warning_alerts
 	ON cnfg.service_quotas (warning_threshold_rate, quota_used, quota_limit)
  WHERE warning_alert_sent = FALSE
-   AND status = 'ACTIVE' 
+   AND status = 'ACTIVE'
    AND deleted = FALSE;
 
 -- 위험 알림 대상 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_service_quotas__critical_alerts
 	ON cnfg.service_quotas (critical_threshold_rate, quota_used, quota_limit)
- WHERE critical_alert_sent = FALSE 
-   AND status = 'ACTIVE' 
+ WHERE critical_alert_sent = FALSE
+   AND status = 'ACTIVE'
    AND deleted = FALSE;
 
--- 초과 허용 할당량 조회 최적화   
+-- 초과 허용 할당량 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_service_quotas__overage_enabled
 	ON cnfg.service_quotas (allow_overage, max_overage_rate)
  WHERE allow_overage = TRUE
    AND deleted = FALSE;
 
--- 할당량 초과 상황 조회 최적화   
+-- 할당량 초과 상황 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_service_quotas__quota_exceeded
 	ON cnfg.service_quotas (tenant_id, quota_type, quota_used, quota_limit)
  WHERE quota_used >= quota_limit
    AND deleted = FALSE;
 
--- 만료 예정 할당량 조회 최적화   
+-- 만료 예정 할당량 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_service_quotas__expiring_service_quotas
 	ON cnfg.service_quotas (close_date, status)
- WHERE status = 'ACTIVE' 
+ WHERE status = 'ACTIVE'
    AND deleted = FALSE;
 
--- 할당량 기간별 조회 최적화   
+-- 할당량 기간별 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_service_quotas__quota_period
 	ON cnfg.service_quotas (quota_period, start_date DESC)
  WHERE deleted = FALSE;
 
--- 생성 시간 기준 조회 최적화 
+-- 생성 시간 기준 조회 최적화
 CREATE INDEX IF NOT EXISTS ix_service_quotas__created_at
 	ON cnfg.service_quotas (created_at DESC);
